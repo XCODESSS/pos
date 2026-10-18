@@ -28,7 +28,7 @@ internal fun stockVersion(value: Long) = checkInput(value in 0 until Long.MAX_VA
 @Serializable data class StockMovement(
     val sequence: String, val ingredientId: String, val ingredientName: String, val unit: StockUnit,
     val kind: String, val deltaMilli: Long, val balanceMilli: Long, val commandId: String?, val orderId: String?,
-    val reason: String, val reference: String?, val actorId: String, val createdAt: String,
+    val reason: String, val reference: String?, val actorId: String, val createdAt: String, val stockCountId: String? = null,
 )
 @Serializable data class StockMoveResult(val ingredient: Ingredient, val movement: StockMovement)
 @Serializable data class StockMovementPage(val movements: List<StockMovement>, val nextCursor: String?)

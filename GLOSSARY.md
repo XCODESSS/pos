@@ -33,6 +33,13 @@ _Avoid_: Outlet (a business location, not an independent business)
 
 **Stock adjustment**: An explained correction to recorded stock, including an opening balance.
 
+**Physical stock count**: A staff observation of the quantities physically present for selected ingredients at a point in time.
+_Avoid_: Stock receipt (a delivery, not a count)
+
+**Stock variance**: The difference between a physically counted quantity and the recorded quantity being checked.
+
+**Stock reconciliation**: An explained correction that brings recorded stock into agreement with a physical count while retaining the original difference.
+
 **Stock shortage**: A required ingredient quantity exceeding the recorded quantity available. It is a warning, not automatic proof that the dish is physically unavailable.
 
 **Recipe coverage**: Whether explicit ingredient requirements are mapped for the selected dish, variant and add-ons.

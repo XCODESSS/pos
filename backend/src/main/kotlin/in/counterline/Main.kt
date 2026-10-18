@@ -132,6 +132,19 @@ fun main() {
                         val before = call.queryLong("before"); val limit = call.queryLimit(50)
                         call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.movements(id, before, limit) })
                     }
+                    post("/inventory/counts") {
+                        call.require(Permission.STOCK_MANAGE); val input = call.receive<StockCountInput>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().stockCounts.record(input, call.principal().staff.id) })
+                    }
+                    get("/inventory/counts") {
+                        call.require(Permission.STOCK_READ)
+                        val before = call.queryLong("before"); val limit = call.queryLimit(25)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().stockCounts.list(before, limit) })
+                    }
+                    get("/inventory/counts/{id}") {
+                        call.require(Permission.STOCK_READ)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().stockCounts.get(call.parameters["id"]!!) })
+                    }
                     get("/inventory/recipes") {
                         call.require(Permission.STOCK_READ)
                         val item = call.request.queryParameters["itemId"] ?: throw Problem(400, "invalid_query", "Choose a recipe dish.")
