@@ -1,0 +1,8 @@
+# Explicit verification fallback: run Gradle on the host, package its fresh distribution.
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY build/install/counterline-server/ ./
+USER 10001
+ENV HOST=0.0.0.0
+EXPOSE 8080
+ENTRYPOINT ["/app/bin/counterline-server"]

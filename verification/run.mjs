@@ -26,9 +26,9 @@ const redact = text => secrets.reduce((result, value) => result.replaceAll(value
 let active; let interrupted = false; let created = false;
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { interrupted = true; active?.kill('SIGTERM'); });
 
-function run(command, args, { quiet = false, allowFailure = false, timeoutMs = 600_000 } = {}) {
+function run(command, args, { quiet = false, allowFailure = false, timeoutMs = 600_000, cwd = root } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: root, env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { cwd, env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
     active = child; let output = '';
     const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
     for (const stream of [child.stdout, child.stderr]) stream.on('data', data => {
@@ -59,6 +59,12 @@ try {
       const existing = await run('docker', ['image', 'inspect', `counterline-${service}:${releaseTag}`], { quiet: true, allowFailure: true });
       if (existing.code === 0) throw new Error('Release tags already exist; refusing to overwrite verified artifacts. Reuse them or create a new source commit.');
     }
+  }
+  if (process.argv.includes('--host-backend')) {
+    console.log('Explicit host-backend mode: rebuilding the distribution with host Gradle in offline mode.');
+    const windows = process.platform === 'win32';
+    await run(windows ? 'cmd.exe' : './gradlew', windows ? ['/d', '/c', 'gradlew.bat', '--offline', '--no-daemon', 'installDist'] : ['--offline', '--no-daemon', 'installDist'], { cwd: fileURLToPath(new URL('../backend/', import.meta.url)), quiet: true });
+    environment.VERIFY_BACKEND_DOCKERFILE = 'Dockerfile.host';
   }
   created = true;
   await compose(['build'], { quiet: true });
@@ -99,7 +105,7 @@ try {
     }
     const output = new URL(`./.artifacts/${project}/`, import.meta.url);
     await mkdir(output, { recursive: true });
-    await writeFile(new URL('release.json', output), JSON.stringify({ revision, project, images }, null, 2));
+    await writeFile(new URL('release.json', output), JSON.stringify({ revision, project, backendBuild: process.argv.includes('--host-backend') ? 'host-offline' : 'container', images }, null, 2));
     console.log(`Promoted the tested images locally as counterline-backend:${releaseTag} and counterline-web:${releaseTag}. No push.`);
   }
 } catch (cause) {

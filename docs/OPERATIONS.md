@@ -20,6 +20,8 @@ Prerequisites: Node 22.19+, Docker/Compose. Backend/web image builds supply thei
 node verification/run.mjs
 ```
 
+If container Gradle dependency downloads are unavailable, explicitly run `node verification/run.mjs --host-backend` (optionally with `--browser`). This requires JDK21 and an already populated host Gradle cache: the runner rebuilds the distribution with host Gradle `--offline`, then packages it with `backend/Dockerfile.host`. It does not weaken TLS, reuse a stale unchecked JAR, skip acceptance/restore checks or silently change the default container build. Release records identify this build mode.
+
 The runner creates `counterline-verify-<random>`, two databases with separate roles/passwords, random loopback ports and a private volume. It performs public HTTP checks, identity-mismatch probes and a real `pg_dump` → fresh database → `pg_restore` drill. Financial assertions inspect the public interface, not private database tables. Only the generated project/volume and temporary files are removed afterward. Do not override its project identity or redirect the tests at development/staging.
 
 Database isolation is not the only test: the suite checks server pricing, immutable receipts, duplicate/concurrent commands, stale versions, kitchen permissions, split-cash reconciliation and restored sessions/reports. It is not a security audit, full migration-upgrade matrix or load test.

@@ -1,0 +1,7 @@
+*
+!build/
+build/*
+!build/install/
+build/install/*
+!build/install/counterline-server/
+!build/install/counterline-server/**

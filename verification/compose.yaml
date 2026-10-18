@@ -19,6 +19,7 @@ services:
     image: ${VERIFY_PROJECT:?runner project required}-backend
     build:
       context: ../backend
+      dockerfile: ${VERIFY_BACKEND_DOCKERFILE:-Dockerfile}
       labels:
         org.opencontainers.image.revision: ${VERIFY_SOURCE_REVISION:-worktree}
     environment:
