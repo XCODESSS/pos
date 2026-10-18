@@ -34,4 +34,12 @@ test('restored tenant retains settled bill snapshots, split payments and sales e
   const countHistory = await api(`/inventory/movements?ingredientId=${counted.id}`, undefined, accessToken);
   assert.deepEqual(countHistory.data, expected.count.history); assert.equal(countHistory.data.movements.length, 1);
   assert.equal(countHistory.data.movements[0].stockCountId, count.data.id);
+  const purchasing = expected.purchasing;
+  assert.deepEqual((await api(`/purchasing/orders/${purchasing.purchaseOrder.id}`, undefined, accessToken)).data, purchasing.detail);
+  assert.deepEqual((await api('/purchasing/orders', purchasing.purchaseOrder, accessToken)).data, purchasing.detail.order);
+  assert.deepEqual((await api(`/purchasing/orders/${purchasing.purchaseOrder.id}/receipts`, purchasing.deliveryCommand, accessToken)).data, purchasing.receipt);
+  assert.deepEqual((await api(`/purchasing/orders/${purchasing.purchaseOrder.id}/close`, purchasing.closeCommand, accessToken)).data, purchasing.detail.order);
+  const purchasedId = purchasing.purchaseOrder.lines[0].ingredientId;
+  assert.deepEqual((await api(`/inventory/movements?ingredientId=${purchasedId}`, undefined, accessToken)).data, purchasing.history);
+  assert.equal((await api('/inventory', undefined, accessToken)).data.ingredients.find(value => value.id === purchasedId).balanceMilli, 2500);
 });

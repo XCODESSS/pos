@@ -55,7 +55,19 @@ try {
   assert.equal((await api('/inventory/ingredients', { id: countIngredientId, name: 'Restore counted ingredient', unit: 'EACH', lowStockMilli: 1000 }, token)).status, 200);
   const countCommand = { id: uuid(), reason: 'Recovery physical count', lines: [{ ingredientId: countIngredientId, expectedVersion: 0, countedMilli: 12000 }] };
   const count = await api('/inventory/counts', countCommand, token); assert.equal(count.status, 200);
-  const expected = { count: { command: countCommand, document: count.data,
+  const supplierId = uuid(); const purchaseIngredientId = uuid();
+  assert.equal((await api('/purchasing/suppliers', { id: supplierId, name: 'Restore supplier', contact: 'Delivery desk' }, token)).status, 200);
+  assert.equal((await api('/inventory/ingredients', { id: purchaseIngredientId, name: 'Restore purchased ingredient', unit: 'ML', lowStockMilli: 0 }, token)).status, 200);
+  const purchaseOrder = { id: uuid(), supplierId, reference: 'Restore purchase', lines: [{ ingredientId: purchaseIngredientId, quantityMilli: 5000 }] };
+  assert.equal((await api('/purchasing/orders', purchaseOrder, token)).status, 200);
+  const deliveryCommand = { id: uuid(), expectedVersion: 0, reference: 'Restore partial delivery', lines: [{ ingredientId: purchaseIngredientId, expectedStockVersion: 0, quantityMilli: 2500 }] };
+  const delivery = await api(`/purchasing/orders/${purchaseOrder.id}/receipts`, deliveryCommand, token); assert.equal(delivery.status, 200);
+  const closeCommand = { id: uuid(), expectedVersion: 1, reason: 'Restore closed remainder' };
+  assert.equal((await api(`/purchasing/orders/${purchaseOrder.id}/close`, closeCommand, token)).status, 200);
+  const expected = { purchasing: { purchaseOrder, deliveryCommand, closeCommand, receipt: delivery.data,
+      detail: (await api(`/purchasing/orders/${purchaseOrder.id}`, undefined, token)).data,
+      history: (await api(`/inventory/movements?ingredientId=${purchaseIngredientId}`, undefined, token)).data },
+    count: { command: countCommand, document: count.data,
       ingredient: (await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === countIngredientId),
       history: (await api(`/inventory/movements?ingredientId=${countIngredientId}`, undefined, token)).data },
     orderId, checkId, bill: order.data.bill, report: (await api('/reports/today', undefined, token)).data,
@@ -82,7 +94,7 @@ try {
   await waitReady(environment.VERIFY_BASE_URL);
   assert.equal((await api('/auth/me', undefined, token)).status, 200, 'persisted session still resolves after restoring into a different database');
   await promisify(execFile)(process.execPath, ['--test', 'verification/recovery.test.mjs'], { env: { ...environment, VERIFY_RECOVERY_RECORD: record }, timeout: 60_000, maxBuffer: 1024 * 1024 }).then(result => process.stdout.write(result.stdout));
-  console.log('Recovery drill passed: fresh scratch database, original receipt, cash splits, negative stock/ledger, recipe versions, submission snapshot, physical count evidence/replay, persisted session and unchanged sales.');
+  console.log('Recovery drill passed: fresh scratch database, original receipt, cash splits, negative stock/ledger, recipe versions, submission snapshot, physical count evidence/replay, purchase order/delivery/closure, persisted session and unchanged sales.');
 } finally {
   await rm(directory, { recursive: true, force: true });
 }

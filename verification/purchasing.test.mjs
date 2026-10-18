@@ -142,6 +142,13 @@ test('purchasing history, receiving and closing obey roles and isolate reused id
   assert.equal((await api('/purchasing/orders', order, beta, '/t/beta')).status, 404);
   assert.equal((await api(`/purchasing/orders/${order.id}/receipts`, delivery([item]), beta, '/t/beta')).status, 404);
   assert.equal((await api('/purchasing/orders', undefined, beta, '/t/beta')).data.orders.length, 0);
+  assert.equal((await api('/purchasing/suppliers', { id: order.supplierId, name: 'Independent beta supplier' }, beta, '/t/beta')).status, 200);
+  assert.equal((await api('/inventory/ingredients', { id: item.id, name: 'Independent beta purchase ingredient', unit: 'ML', lowStockMilli: 0 }, beta, '/t/beta')).status, 200);
+  const betaOrder = await api('/purchasing/orders', order, beta, '/t/beta');
+  assert.equal(betaOrder.status, 200); assert.equal(betaOrder.data.lines[0].unit, 'ML'); assert.equal(betaOrder.data.status, 'OPEN');
+  assert.equal((await api(`/purchasing/orders/${order.id}/receipts`, delivery([item]), beta, '/t/beta')).status, 200);
+  assert.equal((await api(`/purchasing/orders/${order.id}`, undefined, token)).data.order.status, 'CLOSED');
+  assert.equal((await stock(token, item.id)).balanceMilli, 400000);
   const page = await api('/purchasing/orders?limit=1', undefined, token);
   assert.equal(page.status, 200); assert.equal(page.data.orders[0].id, order.id); assert.ok(page.data.nextCursor);
   assert.equal((await api(`/purchasing/orders?limit=1&before=${page.data.nextCursor}`, undefined, token)).status, 200);
