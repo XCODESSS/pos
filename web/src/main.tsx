@@ -7,6 +7,7 @@ import { MenuView, StaffView } from './AdminViews';
 import { SessionGate, PasswordView } from './Session';
 import { MenuPicker, CartLines, addLine, quantityChange, describeLine } from './MenuComposer';
 import { FrontDeskView } from './FrontDeskView';
+import { InventoryView } from './InventoryView';
 import { storageKey, tenantSlug, TenantLanding } from './Tenant';
 import './frontdesk.css';
 import './style.css';
@@ -19,8 +20,8 @@ function savedRequest(): CreateOrder | null {
   try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || 'null'); } catch { return null; }
 }
 
-type View = 'pos' | 'tables' | 'orders' | 'kitchen' | 'menu' | 'staff' | 'account';
-const viewLabels: Record<View, string> = { pos: 'Point of sale', tables: 'Tables & checks', orders: 'Orders & bills', kitchen: 'Kitchen display', menu: 'Menu management', staff: 'Staff accounts', account: 'Your account' };
+type View = 'pos' | 'tables' | 'orders' | 'kitchen' | 'menu' | 'inventory' | 'staff' | 'account';
+const viewLabels: Record<View, string> = { pos: 'Point of sale', tables: 'Tables & checks', orders: 'Orders & bills', kitchen: 'Kitchen display', menu: 'Menu management', inventory: 'Inventory & recipes', staff: 'Staff accounts', account: 'Your account' };
 function Workspace({ session, logout, suspended, passwordChanged }: { session: StaffSession; logout: () => Promise<void>; suspended: boolean; passwordChanged: () => void }) {
   const token = session.accessToken;
   const allowed = (permission: string) => session.permissions.includes(permission);
@@ -29,7 +30,7 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
   const navigation = ([
     ['pos', '▦', 'Point of sale', 'ORDERS_WRITE'], ['tables', '⊞', 'Tables & checks', 'ORDERS_READ'], ['orders', '≡', 'Orders & bills', 'ORDERS_READ'],
     ['kitchen', '♧', 'Kitchen display', 'KITCHEN_READ'], ['menu', '☷', 'Menu management', 'MENU_MANAGE'],
-    ['staff', '♙', 'Staff accounts', 'STAFF_MANAGE'], ['account', '○', 'Your account', ''],
+    ['inventory', '◫', 'Inventory & recipes', 'STOCK_READ'], ['staff', '♙', 'Staff accounts', 'STAFF_MANAGE'], ['account', '○', 'Your account', ''],
   ] as const).filter(([, , , permission]) => !permission || allowed(permission));
   const shownView = navigation.some(([key]) => key === view) ? view : navigation[0][0];
   const actionInFlight = useRef(false);
@@ -144,7 +145,7 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
       <div className="session-strip"><span>{session.staff.displayName} <small>· {session.staff.role.toLowerCase()} · Business: {tenantSlug}</small></span><button className="secondary" disabled={busy} onClick={() => void signOut()}>Sign out</button></div>
       {!connected ? <section className="connect-panel"><h2>{busy ? 'Opening your workspace…' : 'Workspace could not be loaded'}</h2><p>Signed in as {session.staff.username}. Existing checkout IDs will be recovered, not recreated.</p>{error && <p className="error" role="alert">{error}</p>}<button className="primary" disabled={busy} onClick={() => void perform(connect)}>Retry loading workspace</button></section> : <>
       {error && <div className="error" role="alert">{error} {pending && 'Your checkout ID is preserved. Retry this bill; do not create another.'}</div>}
-      {suspended ? null : shownView === 'account' ? <PasswordView token={token} onChanged={passwordChanged}/> : shownView === 'staff' ? <StaffView token={token} ownId={session.staff.id}/> : shownView === 'menu' ? <MenuView token={token} onSaved={refreshMenu}/> : shownView === 'tables' ? <FrontDeskView token={token} canManage={allowed('TABLES_MANAGE')} canOrder={allowed('ORDERS_WRITE')} canPay={allowed('CASH_RECORD')} initialCheckId={checkToOpen} onOpened={() => setCheckToOpen(null)} onSettled={refreshReport}/> : shownView === 'orders' ? <OrdersView token={token} busy={busy} canOpen={canOpenOrder} onOpen={openOrder}/> : shownView === 'kitchen' ? <KitchenView token={token} canWrite={allowed('KITCHEN_WRITE')}/> : <div className="pos-layout">
+      {suspended ? null : shownView === 'account' ? <PasswordView token={token} onChanged={passwordChanged}/> : shownView === 'staff' ? <StaffView token={token} ownId={session.staff.id}/> : shownView === 'inventory' ? <InventoryView token={token} canManage={allowed('STOCK_MANAGE')}/> : shownView === 'menu' ? <MenuView token={token} onSaved={refreshMenu}/> : shownView === 'tables' ? <FrontDeskView token={token} canManage={allowed('TABLES_MANAGE')} canOrder={allowed('ORDERS_WRITE')} canPay={allowed('CASH_RECORD')} initialCheckId={checkToOpen} onOpened={() => setCheckToOpen(null)} onSettled={refreshReport}/> : shownView === 'orders' ? <OrdersView token={token} busy={busy} canOpen={canOpenOrder} onOpen={openOrder}/> : shownView === 'kitchen' ? <KitchenView token={token} canWrite={allowed('KITCHEN_WRITE')}/> : <div className="pos-layout">
         <MenuPicker menu={menu} locked={locked} onAdd={line => setCart(previous => addLine(previous, line))} refresh={() => void perform(refreshMenu)}/>
         <section className="ticket" aria-label="Current bill">
           <div className="ticket-heading"><div><span className="eyebrow">THE ORDER</span><h2>{order ? order.bill.billNumber : 'New bill'}</h2></div><span className="ticket-count">{order ? order.status : `${quantity} items`}</span></div>

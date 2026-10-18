@@ -14,6 +14,7 @@ class TenantConfig(
     val ownerUsername: String? = null, val ownerPassword: String? = null,
 )
 class TenantRuntime(val id: String, val slug: String, val source: HikariDataSource, json: Json) {
+    val inventory = Inventory(source, json)
     val checkout = Checkout(source, json)
     val identity = Identity(source)
     val catalog = Catalog(source, json)

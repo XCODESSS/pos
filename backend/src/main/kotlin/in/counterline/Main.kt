@@ -110,6 +110,28 @@ fun main() {
                         call.require(Permission.MENU_MANAGE); val input = call.receive<MenuChange>()
                         call.respond(withContext(Dispatchers.IO) { call.tenant().catalog.change(call.parameters["id"]!!, input, call.principal().staff.id) })
                     }
+                    get("/inventory") {
+                        call.require(Permission.STOCK_READ)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.summary() })
+                    }
+                    post("/inventory/ingredients") {
+                        call.require(Permission.STOCK_MANAGE); val input = call.receive<IngredientCreate>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.create(input, call.principal().staff.id) })
+                    }
+                    post("/inventory/ingredients/{id}") {
+                        call.require(Permission.STOCK_MANAGE); val input = call.receive<IngredientChange>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.change(call.parameters["id"]!!, input, call.principal().staff.id) })
+                    }
+                    post("/inventory/ingredients/{id}/movements") {
+                        call.require(Permission.STOCK_MANAGE); val input = call.receive<StockMove>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.move(call.parameters["id"]!!, input, call.principal().staff.id) })
+                    }
+                    get("/inventory/movements") {
+                        call.require(Permission.STOCK_READ)
+                        val id = call.request.queryParameters["ingredientId"] ?: throw Problem(400, "invalid_query", "Choose an ingredient.")
+                        val before = call.queryLong("before"); val limit = call.queryLimit(50)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.movements(id, before, limit) })
+                    }
                     get("/tables") {
                         call.require(Permission.ORDERS_READ)
                         call.respond(withContext(Dispatchers.IO) { call.tenant().frontDesk.tables() })
