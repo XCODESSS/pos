@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiFailure, kitchenLabels, localTime, money, request, type CartLine, type DiningTable, type MenuItem, type RunningCheck } from './api';
 import { addLine, CartLines, describeLine, MenuPicker, quantityChange } from './MenuComposer';
 
-const PENDING = 'counterline.frontdesk.pending';
-const SELECTED = 'counterline.frontdesk.selected';
-const DRAFT = 'counterline.frontdesk.draft';
+import { storageKey, tenantSlug } from './Tenant';
+const PENDING = tenantSlug ? storageKey('frontdesk.pending') : '';
+const SELECTED = tenantSlug ? storageKey('frontdesk.selected') : '';
+const DRAFT = tenantSlug ? storageKey('frontdesk.draft') : '';
 type Command = { path: string; body: unknown; kind: 'table' | 'check'; clearDraft?: boolean };
 function saved<T>(key: string): T | null { try { return JSON.parse(sessionStorage.getItem(key) || 'null'); } catch { return null; } }
 function TableEditor({ tables, disabled, save }: { tables: DiningTable[]; disabled: boolean; save: (command: Command) => Promise<boolean> }) {

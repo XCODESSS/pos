@@ -59,3 +59,13 @@ Use explicit cashier/kitchen/manager permissions, owner-only staff administratio
 Rationale: common HTTP identity works for web and native clients; persisted sessions support immediate subsequent-request revocation without embedding stale roles in stateless JWTs. New financial actions carry staff attribution and audit events in the same transaction. Older anonymous records stay unknown. Menu edits govern future order prices only; historical snapshots are immutable.
 
 Trade-offs: additional DB lookup per authenticated request; memory-only web bearer tokens still require XSS/CSP/TLS review; JDK PBKDF2 is a portable initial implementation, while OWASP prefers Argon2id for new systems. No MFA, idle-expiry, forced initial rotation, self-service owner recovery, tenant isolation or tamper-evident audit guarantee is implied. Revisit before public pilot/device/offline authorization work; see `../IDENTITY.md`.
+
+## D-008 — Multi-tenant SaaS, initially isolated by database
+
+Date: 2026-10-18. Status: accepted user scope; initial implementation architecture, not a fleet-scale freeze.
+
+The user confirmed independent-business SaaS. One restaurant business is one tenant; an outlet is a location within that tenant. Initially route `/t/{business-code}/api` through an explicit operator-owned startup registry to a separate PostgreSQL database/pool and existing module instances. There is no ambiguous `/api` fallback. Staff sessions are looked up only in the selected tenant database; browser recovery journals are namespaced by business code. A durable database marker rejects reuse under a different immutable tenant identity or deployment environment.
+
+Rationale: strong data separation without retrofitting scope predicates into every prototype query or rewriting the product modules. Separate nonsuperuser database roles also deny cross-database CONNECT. Trade-off: per-tenant provisioning, migration, connection and backup overhead; this is not automated onboarding or a production SaaS control plane. The initial registry is bounded to 32 tenants and three connections per pool per application instance. Existing development data is assigned to the demo business, never copied to staging. Startup migrations still use each database-owning role; separate migration/runtime privileges remain a production-hardening gate.
+
+Revisit before a large fleet, dynamic onboarding, multi-outlet authorization or horizontal deployment requires a control plane. Shared-schema tenancy would require an explicit migration and enforced isolation, never merely trusting a client-supplied tenant field. Verification uses two businesses with identical usernames/menu IDs, cross-token/ID denials, isolated reports and startup identity-mismatch probes.

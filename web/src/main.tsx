@@ -7,13 +7,14 @@ import { MenuView, StaffView } from './AdminViews';
 import { SessionGate, PasswordView } from './Session';
 import { MenuPicker, CartLines, addLine, quantityChange, describeLine } from './MenuComposer';
 import { FrontDeskView } from './FrontDeskView';
+import { storageKey, tenantSlug, TenantLanding } from './Tenant';
 import './frontdesk.css';
 import './style.css';
 import './workspaces.css';
 import './administration.css';
 
-const PENDING_KEY = 'counterline.pending';
-const ORDER_KEY = 'counterline.currentOrder';
+const PENDING_KEY = tenantSlug ? storageKey('pending') : '';
+const ORDER_KEY = tenantSlug ? storageKey('currentOrder') : '';
 function savedRequest(): CreateOrder | null {
   try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || 'null'); } catch { return null; }
 }
@@ -165,6 +166,7 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
 }
 
 function App() {
+  if (!tenantSlug) return <TenantLanding/>;
   return <SessionGate>{(session, logout, expired, passwordChanged) => <Workspace key={session.staff.id} session={session} logout={logout} suspended={expired} passwordChanged={passwordChanged}/>}</SessionGate>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

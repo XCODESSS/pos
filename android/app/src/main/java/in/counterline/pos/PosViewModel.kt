@@ -16,7 +16,7 @@ import java.util.UUID
 class PosViewModel(application: Application) : AndroidViewModel(application) {
     private val api = PosApi()
     private val preferences = application.getSharedPreferences("checkout", 0)
-    var base by mutableStateOf("http://10.0.2.2:8080")
+    var base by mutableStateOf("http://10.0.2.2:8080/t/demo")
     var username by mutableStateOf("")
     var password by mutableStateOf("")
     private var token = ""

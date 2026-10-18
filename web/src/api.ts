@@ -1,3 +1,5 @@
+import { tenantPath } from './Tenant';
+
 export type MenuChoice = { id: string; name: string; pricePaise: number; available: boolean };
 export type MenuItem = {
   id: string; name: string; category: string; pricePaise: number;
@@ -51,7 +53,8 @@ export async function request<T>(token: string, path: string, body?: unknown, si
   if (signal?.aborted) abort();
   else signal?.addEventListener('abort', abort, { once: true });
   try {
-    const response = await fetch(`/api${path}`, {
+    if (!tenantPath) throw new Error('Select a business workspace before signing in.');
+    const response = await fetch(`${tenantPath}/api${path}`, {
       method: body === undefined ? 'GET' : 'POST',
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal,

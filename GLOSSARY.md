@@ -4,6 +4,13 @@ The language of staff ordering, billing and kitchen work in Counterline. Payment
 
 ## Language
 
+**Tenant**: An independent restaurant business using Counterline, with its own staff, restaurant records and financial history.
+_Avoid_: Outlet (a business location, not an independent business)
+
+**Outlet**: One restaurant location operated by a tenant. A business can have several outlets.
+
+**Business code**: The operator-assigned name used to open a tenant's staff workspace. Knowing the code does not grant access.
+
 **Staff account**: An individual employee's named access to restaurant work, governed by a role and active status. Disabling it does not erase the employee's historical actions.
 
 **Owner**: The restaurant operator who controls staff access and all supported business operations.

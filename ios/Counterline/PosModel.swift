@@ -9,7 +9,7 @@ private struct CheckoutJournal: Codable {
 
 @MainActor
 final class PosModel: ObservableObject {
-    @Published var server = "http://localhost:8080"
+    @Published var server = "http://localhost:8080/t/demo"
     @Published var username = ""
     @Published var password = ""
     @Published private(set) var displayName = ""

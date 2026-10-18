@@ -2,13 +2,16 @@ services:
   db:
     image: postgres:17.5-alpine
     environment:
-      POSTGRES_DB: counterline
-      POSTGRES_USER: counterline
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${VERIFY_DB_PASSWORD:?runner-generated password required}
+      VERIFY_ALPHA_DB_PASSWORD: ${VERIFY_ALPHA_DB_PASSWORD}
+      VERIFY_BETA_DB_PASSWORD: ${VERIFY_BETA_DB_PASSWORD}
     volumes:
       - data:/var/lib/postgresql/data
+      - ./init-tenants.sh:/docker-entrypoint-initdb.d/tenants.sh:ro
     healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U counterline']
+      test: [CMD-SHELL, 'pg_isready -U postgres']
       interval: 2s
       timeout: 3s
       retries: 30
@@ -16,11 +19,8 @@ services:
     image: ${VERIFY_PROJECT:?runner project required}-backend
     build: ../backend
     environment:
-      JDBC_URL: jdbc:postgresql://db:5432/counterline
-      DB_USER: counterline
-      DB_PASSWORD: ${VERIFY_DB_PASSWORD}
-      OWNER_USERNAME: ${VERIFY_OWNER_USERNAME}
-      OWNER_PASSWORD: ${VERIFY_OWNER_PASSWORD}
+      TENANTS_JSON: ${VERIFY_TENANTS_JSON:?runner registry required}
+      APP_ENV: ${VERIFY_APP_ENV:-verification}
       HOST: 0.0.0.0
     depends_on:
       db:
