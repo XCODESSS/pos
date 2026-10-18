@@ -8,6 +8,7 @@ import { SessionGate, PasswordView } from './Session';
 import { MenuPicker, CartLines, addLine, quantityChange, describeLine } from './MenuComposer';
 import { FrontDeskView } from './FrontDeskView';
 import { InventoryView } from './InventoryView';
+import { StockWarnings, StockPreviewPanel } from './StockWarnings';
 import { storageKey, tenantSlug, TenantLanding } from './Tenant';
 import './frontdesk.css';
 import './style.css';
@@ -152,6 +153,7 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
           {!order && <div className="workspace-notice">Takeaway counter. For dine-in, use <button className="park-button" disabled={locked || quantity > 0} onClick={() => setView('tables')}>Tables & checks →</button></div>}
           {order && <p className="bill-context">{order.bill.orderType === 'DINE_IN' ? `Dine-in · ${order.bill.tableLabel}` : 'Takeaway'} · {localTime(order.bill.createdAt)} IST</p>}
           {order?.kitchen && <span className={`state-badge ticket-kitchen kitchen-${order.kitchen.status.toLowerCase()}`}>Kitchen · {kitchenLabels[order.kitchen.status]}</span>}
+          {order ? <StockWarnings snapshot={order.inventory ?? null} historical/> : <StockPreviewPanel token={token} lines={cart} disabled={locked}/>}
           <div className="ticket-lines">{order ? order.bill.lines.map((line, index) => <div className="ticket-line" key={index}><div><strong>{line.name}</strong><small>{line.quantity} × {money(line.unitPricePaise)}</small></div><strong>{money(line.subtotalPaise)}</strong></div>) : cart.length ? <CartLines lines={cart} menu={menu} locked={locked} onChange={changeQuantity}/> : <div className="empty-cart"><span>＋</span><h3>A little empty here</h3><p>Tap a menu item to<br/>start your next great order.</p></div>}</div>
           <div className="ticket-bottom"><div className="totals"><div><span>Subtotal</span><span>{money(order?.bill.subtotalPaise ?? subtotal)}</span></div>{order ? <><div><span>CGST</span><span>{money(order.bill.cgstPaise)}</span></div><div><span>SGST</span><span>{money(order.bill.sgstPaise)}</span></div><div className="grand-total"><span>Total payable</span><strong>{money(order.bill.totalPaise)}</strong></div></> : <p>Tax will be shown on the generated bill.</p>}</div>
           {order?.status === 'PAID' ? <><div className="paid-message" role="status">✓ Cash payment recorded</div><button className="primary full" disabled={busy} onClick={newSale}>Start next sale →</button></> : order ? <><button className="primary full" disabled={busy} onClick={() => void perform(pay)}>{busy ? 'Recording…' : `Record exact cash · ${money(order.bill.totalPaise)}`}</button><small className="payment-note">Confirm you have physically received the cash.</small></> : <button className="primary full" disabled={busy || (!pending && (!quantity || cart.some(line => !describeLine(line, menu).available)))} onClick={() => void perform(checkout)}>{busy ? 'Creating bill…' : pending ? 'Retry same bill →' : 'Create bill →'}</button>}

@@ -12,14 +12,15 @@ import java.util.UUID
 import javax.sql.DataSource
 
 /** Owns orders: server pricing, bill snapshots, cash settlement and kitchen progress. */
-class Checkout(private val dataSource: DataSource, private val json: Json) {
+class Checkout(private val dataSource: DataSource, private val json: Json, private val inventory: Inventory) {
     private val orderSelect = """
         SELECT o.*, k.status AS kitchen_status, k.version AS kitchen_version,
                k.updated_at AS kitchen_updated_at,
-               t.floor || ' / ' || t.label AS current_table_label
+               t.floor || ' / ' || t.label AS current_table_label, s.snapshot AS stock_snapshot
         FROM orders o LEFT JOIN kitchen_tickets k ON k.order_id = o.id
         LEFT JOIN running_checks c ON c.id = o.check_id
         LEFT JOIN dining_tables t ON t.id = c.table_id
+        LEFT JOIN order_inventory s ON s.order_id = o.id
     """.trimIndent()
     fun menu(): List<MenuItem> = dataSource.connection.use { menu(it) }
 
@@ -75,6 +76,7 @@ class Checkout(private val dataSource: DataSource, private val json: Json) {
             connection.prepareStatement("UPDATE orders SET bill = ?::jsonb WHERE id = ?").use {
                 it.setString(1, json.encodeToString(bill)); it.setObject(2, id); it.executeUpdate()
             }
+            inventory.consume(connection, id, request.lines, menuById, actor)
             connection.prepareStatement("""
                 INSERT INTO kitchen_tickets(order_id, status, updated_at) VALUES (?, 'QUEUED', ?)
             """.trimIndent()).use {
@@ -217,7 +219,7 @@ class Checkout(private val dataSource: DataSource, private val json: Json) {
         }
         return Order(json.decodeFromString<Bill>(rows.getString("bill")),
             if (paidAt == null) "OPEN" else "PAID", paidAt, received, kitchen,
-            rows.getObject("created_by")?.toString(), rows.getObject("paid_by")?.toString(), rows.getObject("check_id")?.toString(), rows.getString("current_table_label"))
+            rows.getObject("created_by")?.toString(), rows.getObject("paid_by")?.toString(), rows.getObject("check_id")?.toString(), rows.getString("current_table_label"), rows.getString("stock_snapshot")?.let { json.decodeFromString<StockSnapshot>(it) })
     }
 
     private fun parseId(id: String): UUID = try { UUID.fromString(id) } catch (_: IllegalArgumentException) {

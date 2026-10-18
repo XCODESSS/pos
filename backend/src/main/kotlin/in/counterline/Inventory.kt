@@ -94,6 +94,118 @@ class Inventory(private val source: DataSource, private val json: Json) {
             }
         }
     }
+    fun recipe(input: RecipeTarget, version: Long?): Recipe = source.connection.use { connection ->
+        val target = input.validated()
+        checkInput(version == null || version > 0, "Invalid recipe version.")
+        findRecipe(connection, target, version) ?: if (version == null) {
+            menuItem(connection, target.itemId)
+            Recipe(target.itemId, target.kind, target.choiceId, 0, emptyList())
+        } else throw Problem(404, "recipe_not_found", "Recipe version not found.")
+    }
+    fun saveRecipe(input: RecipeWrite, actor: String): Recipe = transaction { connection ->
+        val target = RecipeTarget(input.itemId, input.kind, input.choiceId).validated()
+        stockVersion(input.expectedVersion)
+        checkInput(input.components.size <= 40 && input.components.map { it.ingredientId }.distinct().size == input.components.size, "Use at most 40 unique ingredients per recipe.")
+        val components = input.components.map {
+            stockId(it.ingredientId); checkInput(it.quantityMilli in 1..1_000_000_000L, "Recipe quantities must be positive and at most 1,000,000 base units per serving."); it
+        }.sortedBy { it.ingredientId }
+        val menu = menuItem(connection, target.itemId)
+        checkInput(when (target.kind) {
+            RecipeKind.BASE -> true
+            RecipeKind.VARIANT -> menu.variants.any { it.id == target.choiceId }
+            RecipeKind.ADDON -> menu.addons.any { it.id == target.choiceId }
+        }, "Recipe choice does not belong to this dish.")
+        val ingredients = ingredientMap(connection)
+        components.forEach { if (it.ingredientId !in ingredients) throw Problem(404, "ingredient_not_found", "A recipe ingredient was not found.") }
+        val current = findRecipe(connection, target)
+        if (current?.version == input.expectedVersion + 1 && current.components == components) return@transaction current
+        if ((current?.version ?: 0L) != input.expectedVersion) conflict("Recipe changed elsewhere. Refresh before saving.")
+        connection.prepareStatement("INSERT INTO recipe_versions(item_id,kind,choice_key,version,components,updated_by) VALUES(?,?,?,?,?::jsonb,?)").use {
+            it.setString(1, target.itemId); it.setString(2, target.kind.name); it.setString(3, target.choiceId.orEmpty()); it.setLong(4, input.expectedVersion + 1)
+            it.setString(5, json.encodeToString(components)); it.setObject(6, stockId(actor)); it.executeUpdate()
+        }
+        audit(connection, actor, "RECIPE_VERSION_SAVED", target.key())
+        findRecipe(connection, target) ?: error("Saved recipe missing")
+    }
+    fun preview(input: StockPreview): StockSnapshot = transaction { connection ->
+        val lines = CreateOrder(UUID.randomUUID().toString(), input.lines).validated().lines
+        val menu = connection.createStatement().use { it.executeQuery("SELECT * FROM menu_items WHERE available").use { rows ->
+            buildList { while (rows.next()) add(readMenu(rows, json)) }.associateBy { it.id }
+        } }
+        lines.forEach { line -> pricedLine(menu[line.itemId] ?: throw Problem(400, "unavailable_item", "A selected menu item is unavailable."), line) }
+        calculate(connection, lines, menu)
+    }
+    internal fun consume(connection: Connection, orderId: UUID, lines: List<CartLine>, menu: Map<String, MenuItem>, actor: String): StockSnapshot {
+        lock(connection)
+        val snapshot = calculate(connection, lines, menu)
+        for (requirement in snapshot.requirements) {
+            val current = ingredient(connection, stockId(requirement.ingredientId))
+            val updated = applyDelta(connection, current, -requirement.quantityMilli)
+            appendMovement(connection, current, "CONSUMPTION", -requirement.quantityMilli, updated.balanceMilli,
+                actor, "Accepted kitchen submission", orderId = orderId)
+        }
+        connection.prepareStatement("INSERT INTO order_inventory(order_id,snapshot) VALUES(?,?::jsonb)").use {
+            it.setObject(1, orderId); it.setString(2, json.encodeToString(snapshot)); it.executeUpdate()
+        }
+        audit(connection, actor, "STOCK_SUBMISSION_RECORDED", orderId.toString())
+        return snapshot
+    }
+    private fun calculate(connection: Connection, lines: List<CartLine>, menu: Map<String, MenuItem>): StockSnapshot {
+        val ingredients = ingredientMap(connection)
+        val itemIds = connection.createArrayOf("text", lines.map { it.itemId }.distinct().toTypedArray())
+        val recipes = try { connection.prepareStatement("SELECT DISTINCT ON(item_id,kind,choice_key) * FROM recipe_versions WHERE item_id=ANY(?) ORDER BY item_id,kind,choice_key,version DESC").use {
+            it.setArray(1, itemIds); it.executeQuery().use { rows -> buildList { while (rows.next()) add(decodeRecipe(rows)) }.associateBy { RecipeTarget(it.itemId, it.kind, it.choiceId).key() } }
+        } } finally { itemIds.free() }
+        val required = linkedMapOf<String, Long>(); val gaps = linkedMapOf<String, RecipeGap>(); val uses = linkedMapOf<String, RecipeUse>()
+        for (line in lines) {
+            val item = menu.getValue(line.itemId)
+            val primary = RecipeTarget(item.id, if (line.variantId == null) RecipeKind.BASE else RecipeKind.VARIANT, line.variantId)
+            val targets = listOf(primary) + line.addonIds.map { RecipeTarget(item.id, RecipeKind.ADDON, it) }
+            for (target in targets) {
+                val recipe = recipes[target.key()]
+                val label = item.name + when (target.kind) {
+                    RecipeKind.BASE -> " (base)"
+                    RecipeKind.VARIANT -> " · " + item.variants.first { it.id == target.choiceId }.name
+                    RecipeKind.ADDON -> " + " + item.addons.first { it.id == target.choiceId }.name
+                }
+                if (recipe == null || recipe.components.isEmpty()) {
+                    gaps[target.key()] = RecipeGap(target.itemId, target.kind, target.choiceId, label)
+                    continue
+                }
+                val previous = uses[target.key()]?.servings ?: 0
+                uses[target.key()] = RecipeUse(target.itemId, target.kind, target.choiceId, recipe.version, previous + line.quantity)
+                for (component in recipe.components) {
+                    val total = (required[component.ingredientId] ?: 0L) + component.quantityMilli * line.quantity
+                    checkInput(total in 1..STOCK_LIMIT, "Submission ingredient quantity exceeds the supported numeric range.")
+                    required[component.ingredientId] = total
+                }
+            }
+        }
+        val requirements = required.entries.sortedBy { it.key }.map { (id, quantity) ->
+            val ingredient = ingredients[id] ?: error("Recipe ingredient missing")
+            StockRequirement(id, ingredient.name, ingredient.unit, quantity)
+        }
+        val warnings = requirements.mapNotNull { requirement ->
+            val available = ingredients.getValue(requirement.ingredientId).balanceMilli
+            if (requirement.quantityMilli > available) StockShortage(requirement.ingredientId, requirement.name, requirement.unit, requirement.quantityMilli, available, requirement.quantityMilli - available) else null
+        }
+        return StockSnapshot(requirements, warnings, gaps.values.toList(), uses.values.toList())
+    }
+    private fun ingredientMap(connection: Connection): Map<String, Ingredient> = connection.createStatement().use { statement ->
+        statement.executeQuery("SELECT * FROM ingredients").use { rows -> buildList { while (rows.next()) add(decodeIngredient(rows)) }.associateBy { it.id } }
+    }
+    private fun menuItem(connection: Connection, id: String): MenuItem = connection.prepareStatement("SELECT * FROM menu_items WHERE id=?").use {
+        it.setString(1, id); it.executeQuery().use { rows -> if (rows.next()) readMenu(rows, json) else throw Problem(404, "menu_not_found", "Dish not found.") }
+    }
+    private fun findRecipe(connection: Connection, target: RecipeTarget, version: Long? = null): Recipe? = connection.prepareStatement(
+        "SELECT * FROM recipe_versions WHERE item_id=? AND kind=? AND choice_key=?${if (version == null) " ORDER BY version DESC LIMIT 1" else " AND version=?"}",
+    ).use {
+        it.setString(1, target.itemId); it.setString(2, target.kind.name); it.setString(3, target.choiceId.orEmpty()); if (version != null) it.setLong(4, version)
+        it.executeQuery().use { rows -> if (rows.next()) decodeRecipe(rows) else null }
+    }
+    private fun decodeRecipe(rows: ResultSet) = Recipe(rows.getString("item_id"), RecipeKind.valueOf(rows.getString("kind")), rows.getString("choice_key").takeIf { it.isNotEmpty() }, rows.getLong("version"),
+        json.decodeFromString(rows.getString("components")), rows.getTimestamp("updated_at").toInstant().toString(), rows.getObject("updated_by").toString())
+
     private fun applyDelta(connection: Connection, current: Ingredient, delta: Long): Ingredient {
         val balance = current.balanceMilli + delta
         checkInput(balance in -STOCK_LIMIT..STOCK_LIMIT, "Resulting stock quantity exceeds the supported numeric range.")

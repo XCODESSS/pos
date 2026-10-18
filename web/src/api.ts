@@ -1,4 +1,5 @@
 import { tenantPath } from './Tenant';
+import type { StockSnapshot } from './inventory';
 
 export type MenuChoice = { id: string; name: string; pricePaise: number; available: boolean };
 export type MenuItem = {
@@ -19,7 +20,7 @@ export type Bill = {
 export type KitchenStatus = 'QUEUED' | 'PREPARING' | 'READY' | 'SERVED';
 export type KitchenTicket = { status: KitchenStatus; version: number; updatedAt: string };
 export type KitchenChange = { status: KitchenStatus; expectedVersion: number };
-export type Order = { bill: Bill; status: 'OPEN' | 'PAID'; paidAt: string | null; cashReceivedPaise: number | null; kitchen: KitchenTicket | null; checkId: string | null };
+export type Order = { bill: Bill; status: 'OPEN' | 'PAID'; paidAt: string | null; cashReceivedPaise: number | null; kitchen: KitchenTicket | null; checkId: string | null; inventory: StockSnapshot | null };
 export type OrderPage<T = Order> = { orders: T[]; nextCursor: string | null };
 export type KitchenOrder = { bill: Pick<Bill, 'id' | 'billNumber' | 'createdAt' | 'orderType' | 'tableLabel'> & { lines: { itemId: string; name: string; quantity: number }[] }; status: 'OPEN' | 'PAID'; kitchen: KitchenTicket | null };
 export type StaffRole = 'OWNER' | 'MANAGER' | 'CASHIER' | 'KITCHEN';

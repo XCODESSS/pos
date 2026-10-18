@@ -76,6 +76,7 @@ data class Order(
     val bill: Bill, val status: String, val paidAt: String?, val cashReceivedPaise: Long?,
     val kitchen: KitchenTicket?, val createdBy: String? = null, val paidBy: String? = null,
     val checkId: String? = null, val currentTableLabel: String? = null,
+    val inventory: StockSnapshot? = null,
 )
 
 @Serializable

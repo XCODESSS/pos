@@ -5,6 +5,15 @@ export type InventorySummary = { ingredients: Ingredient[] };
 export type StockMovement = { sequence: string; ingredientId: string; ingredientName: string; unit: StockUnit; kind: string; deltaMilli: number; balanceMilli: number; commandId: string | null; orderId: string | null; reason: string; reference: string | null; actorId: string; createdAt: string };
 export type StockMovementPage = { movements: StockMovement[]; nextCursor: string | null };
 export type StockMoveResult = { ingredient: Ingredient; movement: StockMovement };
+export type RecipeKind = 'BASE' | 'VARIANT' | 'ADDON';
+export type RecipeComponent = { ingredientId: string; quantityMilli: number };
+export type Recipe = { itemId: string; kind: RecipeKind; choiceId: string | null; version: number; components: RecipeComponent[]; updatedAt: string | null; updatedBy: string | null };
+export type StockSnapshot = {
+  requirements: { ingredientId: string; name: string; unit: StockUnit; quantityMilli: number }[];
+  warnings: { ingredientId: string; name: string; unit: StockUnit; requiredMilli: number; availableMilli: number; shortageMilli: number }[];
+  missingRecipes: { itemId: string; kind: RecipeKind; choiceId: string | null; label: string }[];
+  recipes: { itemId: string; kind: RecipeKind; choiceId: string | null; version: number; servings: number }[];
+};
 
 /** Parse exact decimal text; quantities in transport/ledger remain integer thousandths. */
 export function parseQuantity(text: string, signed = false): number {

@@ -132,6 +132,22 @@ fun main() {
                         val before = call.queryLong("before"); val limit = call.queryLimit(50)
                         call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.movements(id, before, limit) })
                     }
+                    get("/inventory/recipes") {
+                        call.require(Permission.STOCK_READ)
+                        val item = call.request.queryParameters["itemId"] ?: throw Problem(400, "invalid_query", "Choose a recipe dish.")
+                        val kind = try { RecipeKind.valueOf(call.request.queryParameters["kind"] ?: "BASE") } catch (_: IllegalArgumentException) { throw Problem(400, "invalid_query", "Invalid recipe kind.") }
+                        val target = RecipeTarget(item, kind, call.request.queryParameters["choiceId"])
+                        val version = call.queryLong("version")
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.recipe(target, version) })
+                    }
+                    post("/inventory/recipes") {
+                        call.require(Permission.STOCK_MANAGE); val input = call.receive<RecipeWrite>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.saveRecipe(input, call.principal().staff.id) })
+                    }
+                    post("/orders/stock-preview") {
+                        call.require(Permission.ORDERS_WRITE); val input = call.receive<StockPreview>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.preview(input) })
+                    }
                     get("/tables") {
                         call.require(Permission.ORDERS_READ)
                         call.respond(withContext(Dispatchers.IO) { call.tenant().frontDesk.tables() })
