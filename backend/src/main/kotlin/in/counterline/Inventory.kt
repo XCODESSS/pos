@@ -213,6 +213,11 @@ class Inventory(private val source: DataSource, private val json: Json) {
         val updated = applyDelta(connection, current, delta)
         appendMovement(connection, current, "COUNT", delta, updated.balanceMilli, actor, reason, stockCountId = countId)
     }
+    internal fun receivePurchase(connection: Connection, current: Ingredient, quantity: Long, actor: String, reference: String, receiptId: UUID) {
+        checkInput(quantity in 1..STOCK_LIMIT, "Delivery quantities must be positive and within the supported range.")
+        val updated = applyDelta(connection, current, quantity)
+        appendMovement(connection, current, "PURCHASE_RECEIPT", quantity, updated.balanceMilli, actor, "Purchase delivery received", reference, purchaseReceiptId = receiptId)
+    }
     private fun applyDelta(connection: Connection, current: Ingredient, delta: Long): Ingredient {
         val balance = current.balanceMilli + delta
         checkInput(balance in -STOCK_LIMIT..STOCK_LIMIT, "Resulting stock quantity exceeds the supported numeric range.")
@@ -223,14 +228,14 @@ class Inventory(private val source: DataSource, private val json: Json) {
         return current.copy(balanceMilli = balance, version = current.version + 1)
     }
     private fun appendMovement(connection: Connection, current: Ingredient, kind: String, delta: Long, balance: Long,
-        actor: String, reason: String, reference: String? = null, command: UUID? = null, fingerprint: String? = null, orderId: UUID? = null, stockCountId: UUID? = null): StockMovement =
+        actor: String, reason: String, reference: String? = null, command: UUID? = null, fingerprint: String? = null, orderId: UUID? = null, stockCountId: UUID? = null, purchaseReceiptId: UUID? = null): StockMovement =
         connection.prepareStatement("""
-            INSERT INTO stock_movements(ingredient_id,ingredient_name,unit,kind,delta_milli,balance_milli,command_id,fingerprint,order_id,reason,reference_text,actor_id,stock_count_id)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING *
+            INSERT INTO stock_movements(ingredient_id,ingredient_name,unit,kind,delta_milli,balance_milli,command_id,fingerprint,order_id,reason,reference_text,actor_id,stock_count_id,purchase_receipt_id)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING *
         """.trimIndent()).use {
             it.setObject(1, stockId(current.id)); it.setString(2, current.name); it.setString(3, current.unit.name); it.setString(4, kind)
             it.setLong(5, delta); it.setLong(6, balance); it.setObject(7, command); it.setString(8, fingerprint); it.setObject(9, orderId)
-            it.setString(10, reason); it.setString(11, reference); it.setObject(12, stockId(actor)); it.setObject(13, stockCountId)
+            it.setString(10, reason); it.setString(11, reference); it.setObject(12, stockId(actor)); it.setObject(13, stockCountId); it.setObject(14, purchaseReceiptId)
             it.executeQuery().use { rows -> check(rows.next()); decodeMovement(rows) }
         }
     internal fun ingredient(connection: Connection, id: UUID): Ingredient = connection.prepareStatement("SELECT * FROM ingredients WHERE id=?").use {
@@ -244,5 +249,5 @@ class Inventory(private val source: DataSource, private val json: Json) {
     private fun decodeIngredient(rows: ResultSet) = Ingredient(rows.getObject("id").toString(), rows.getString("name"), StockUnit.valueOf(rows.getString("unit")), rows.getLong("low_stock_milli"), rows.getLong("balance_milli"), rows.getLong("version"))
     private fun decodeMovement(rows: ResultSet) = StockMovement(rows.getLong("sequence").toString(), rows.getObject("ingredient_id").toString(), rows.getString("ingredient_name"), StockUnit.valueOf(rows.getString("unit")),
         rows.getString("kind"), rows.getLong("delta_milli"), rows.getLong("balance_milli"), rows.getObject("command_id")?.toString(), rows.getObject("order_id")?.toString(),
-        rows.getString("reason"), rows.getString("reference_text"), rows.getObject("actor_id").toString(), rows.getTimestamp("created_at").toInstant().toString(), rows.getObject("stock_count_id")?.toString())
+        rows.getString("reason"), rows.getString("reference_text"), rows.getObject("actor_id").toString(), rows.getTimestamp("created_at").toInstant().toString(), rows.getObject("stock_count_id")?.toString(), rows.getObject("purchase_receipt_id")?.toString())
 }

@@ -161,6 +161,34 @@ fun main() {
                         call.require(Permission.ORDERS_WRITE); val input = call.receive<StockPreview>()
                         call.respond(withContext(Dispatchers.IO) { call.tenant().inventory.preview(input) })
                     }
+                    get("/purchasing/suppliers") {
+                        call.require(Permission.STOCK_READ)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().purchasing.suppliers() })
+                    }
+                    post("/purchasing/suppliers") {
+                        call.require(Permission.STOCK_MANAGE); val input = call.receive<SupplierInput>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().purchasing.createSupplier(input, call.principal().staff.id) })
+                    }
+                    get("/purchasing/orders") {
+                        call.require(Permission.STOCK_READ); val before = call.queryLong("before"); val limit = call.queryLimit(20)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().purchasing.list(before, limit) })
+                    }
+                    post("/purchasing/orders") {
+                        call.require(Permission.STOCK_MANAGE); val input = call.receive<PurchaseInput>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().purchasing.createOrder(input, call.principal().staff.id) })
+                    }
+                    get("/purchasing/orders/{id}") {
+                        call.require(Permission.STOCK_READ)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().purchasing.get(call.parameters["id"]!!) })
+                    }
+                    post("/purchasing/orders/{id}/receipts") {
+                        call.require(Permission.STOCK_MANAGE); val input = call.receive<PurchaseReceive>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().purchasing.receive(call.parameters["id"]!!, input, call.principal().staff.id) })
+                    }
+                    post("/purchasing/orders/{id}/close") {
+                        call.require(Permission.STOCK_MANAGE); val input = call.receive<PurchaseClose>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().purchasing.close(call.parameters["id"]!!, input, call.principal().staff.id) })
+                    }
                     get("/tables") {
                         call.require(Permission.ORDERS_READ)
                         call.respond(withContext(Dispatchers.IO) { call.tenant().frontDesk.tables() })

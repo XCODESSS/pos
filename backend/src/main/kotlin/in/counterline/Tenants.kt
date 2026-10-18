@@ -16,6 +16,7 @@ class TenantConfig(
 class TenantRuntime(val id: String, val slug: String, val source: HikariDataSource, json: Json) {
     val inventory = Inventory(source, json)
     val stockCounts = StockCounts(source, json, inventory)
+    val purchasing = Purchasing(source, json, inventory)
     val checkout = Checkout(source, json, inventory)
     val identity = Identity(source)
     val catalog = Catalog(source, json)

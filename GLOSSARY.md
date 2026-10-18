@@ -29,6 +29,15 @@ _Avoid_: Outlet (a business location, not an independent business)
 
 **Stock receipt**: Ingredients physically received into the restaurant's stock. It is not a customer payment receipt or a supplier payable invoice.
 
+**Supplier**: A business or person from whom the restaurant obtains ingredients.
+
+**Purchase order**: A restaurant's recorded request to a supplier for specified ingredient quantities. It is not evidence that stock arrived or that a supplier bill was paid.
+
+**Delivery receipt**: An attributable record of ingredients actually received against a purchase order, including a partial delivery.
+_Avoid_: Supplier bill (a request for payment)
+
+**Unreceived remainder**: The ordered quantities not yet received. Closing this remainder ends further receiving against that order without returning stock already received.
+
 **Wastage**: Ingredients lost or discarded outside preparation recorded against an accepted food submission.
 
 **Stock adjustment**: An explained correction to recorded stock, including an opening balance.
