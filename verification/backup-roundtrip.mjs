@@ -51,7 +51,14 @@ try {
   assert.equal((await api(`/checks/${checkId}/cash-payments`, { id: uuid(), expectedVersion: 1, amountPaise: 7000 }, token)).status, 200);
   assert.equal((await api(`/checks/${checkId}/cash-payments`, { id: uuid(), expectedVersion: 2, amountPaise: 8698 }, token)).status, 200);
   assert.equal((await api('/inventory/recipes', { ...recipe, expectedVersion: 1, components: [{ ingredientId, quantityMilli: 50000 }] }, token)).status, 200);
-  const expected = { orderId, checkId, bill: order.data.bill, report: (await api('/reports/today', undefined, token)).data,
+  const countIngredientId = uuid();
+  assert.equal((await api('/inventory/ingredients', { id: countIngredientId, name: 'Restore counted ingredient', unit: 'EACH', lowStockMilli: 1000 }, token)).status, 200);
+  const countCommand = { id: uuid(), reason: 'Recovery physical count', lines: [{ ingredientId: countIngredientId, expectedVersion: 0, countedMilli: 12000 }] };
+  const count = await api('/inventory/counts', countCommand, token); assert.equal(count.status, 200);
+  const expected = { count: { command: countCommand, document: count.data,
+      ingredient: (await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === countIngredientId),
+      history: (await api(`/inventory/movements?ingredientId=${countIngredientId}`, undefined, token)).data },
+    orderId, checkId, bill: order.data.bill, report: (await api('/reports/today', undefined, token)).data,
     inventory: { ingredientId, itemId: item.id, snapshot: order.data.inventory,
       ingredient: (await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredientId),
       history: (await api(`/inventory/movements?ingredientId=${ingredientId}`, undefined, token)).data,
@@ -75,7 +82,7 @@ try {
   await waitReady(environment.VERIFY_BASE_URL);
   assert.equal((await api('/auth/me', undefined, token)).status, 200, 'persisted session still resolves after restoring into a different database');
   await promisify(execFile)(process.execPath, ['--test', 'verification/recovery.test.mjs'], { env: { ...environment, VERIFY_RECOVERY_RECORD: record }, timeout: 60_000, maxBuffer: 1024 * 1024 }).then(result => process.stdout.write(result.stdout));
-  console.log('Recovery drill passed: fresh scratch database, original receipt, cash splits, negative stock/ledger, recipe versions, submission snapshot, persisted session and unchanged sales.');
+  console.log('Recovery drill passed: fresh scratch database, original receipt, cash splits, negative stock/ledger, recipe versions, submission snapshot, physical count evidence/replay, persisted session and unchanged sales.');
 } finally {
   await rm(directory, { recursive: true, force: true });
 }
