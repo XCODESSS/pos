@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:17.5-alpine
+    environment:
+      POSTGRES_DB: counterline
+      POSTGRES_USER: counterline
+      POSTGRES_PASSWORD: ${VERIFY_DB_PASSWORD:?runner-generated password required}
+    volumes:
+      - data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U counterline']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  backend:
+    image: ${VERIFY_PROJECT:?runner project required}-backend
+    build: ../backend
+    environment:
+      JDBC_URL: jdbc:postgresql://db:5432/counterline
+      DB_USER: counterline
+      DB_PASSWORD: ${VERIFY_DB_PASSWORD}
+      OWNER_USERNAME: ${VERIFY_OWNER_USERNAME}
+      OWNER_PASSWORD: ${VERIFY_OWNER_PASSWORD}
+      HOST: 0.0.0.0
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, java, -cp, '/app/lib/*', in.counterline.HealthCheck]
+      interval: 2s
+      timeout: 5s
+      start_period: 30s
+      retries: 30
+  web:
+    image: ${VERIFY_PROJECT}-web
+    build: ../web
+    ports:
+      - '127.0.0.1::80'
+    depends_on:
+      backend:
+        condition: service_healthy
+volumes:
+  data:
