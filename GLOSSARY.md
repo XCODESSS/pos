@@ -21,6 +21,22 @@ _Avoid_: Outlet (a business location, not an independent business)
 
 **Kitchen staff**: Staff who prepare and hand over dishes without access to receipt prices, cash amounts or sales reports.
 
+**Ingredient**: A stock-tracked material used to prepare dishes, measured in a fixed base unit.
+
+**Recipe**: The ingredient quantities needed for one serving of a base dish, variant or add-on.
+
+**Stock movement**: A recorded increase or decrease in an ingredient's quantity, with its cause and responsible staff member.
+
+**Stock receipt**: Ingredients physically received into the restaurant's stock. It is not a customer payment receipt or a supplier payable invoice.
+
+**Wastage**: Ingredients lost or discarded outside preparation recorded against an accepted food submission.
+
+**Stock adjustment**: An explained correction to recorded stock, including an opening balance.
+
+**Stock shortage**: A required ingredient quantity exceeding the recorded quantity available. It is a warning, not automatic proof that the dish is physically unavailable.
+
+**Recipe coverage**: Whether explicit ingredient requirements are mapped for the selected dish, variant and add-ons.
+
 **Menu item**: A priced dish or drink offered for ordering. Later price or availability changes do not alter already issued bill snapshots.
 _Avoid_: Product (ambiguous with the software product)
 
