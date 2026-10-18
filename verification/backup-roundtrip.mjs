@@ -13,7 +13,7 @@ import { waitReady } from './health.mjs';
 const project = process.env.VERIFY_PROJECT;
 assert.match(project ?? '', /^counterline-verify-[a-f0-9]{12}$/, 'only a runner-owned disposable project may run this drill');
 const file = fileURLToPath(new URL('./compose.yaml', import.meta.url));
-const prefix = ['compose', '--project-name', project, '--file', file];
+const prefix = ['compose', '--env-file', fileURLToPath(new URL('./compose.env', import.meta.url)), '--project-name', project, '--file', file];
 const environment = { ...process.env };
 async function compose(args) {
   try { return await promisify(execFile)('docker', [...prefix, ...args], { env: environment, timeout: 120_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true }); }

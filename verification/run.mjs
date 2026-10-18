@@ -6,6 +6,7 @@ import { waitReady } from './health.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const composeFile = fileURLToPath(new URL('./compose.yaml', import.meta.url));
+const composeEnvironment = fileURLToPath(new URL('./compose.env', import.meta.url));
 const project = `counterline-verify-${randomBytes(6).toString('hex')}`;
 const secret = () => randomBytes(24).toString('hex');
 const environment = {
@@ -43,7 +44,7 @@ function run(command, args, { quiet = false, allowFailure = false, timeoutMs = 6
     });
   });
 }
-const compose = (args, options) => run('docker', ['compose', '--project-name', project, '--file', composeFile, ...args], options);
+const compose = (args, options) => run('docker', ['compose', '--env-file', composeEnvironment, '--project-name', project, '--file', composeFile, ...args], options);
 
 try {
   console.log(`Verification owns disposable project ${project}; development .env is not loaded.`);
