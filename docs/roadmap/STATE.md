@@ -2,12 +2,22 @@
 
 Updated: 2026-10-18
 Target: integrated staff-facing multi-tenant SaaS for India/INR, web + Kotlin Android + SwiftUI iOS/iPadOS
-Current milestone: physical stock reconciliation verified; supplier purchasing next
-Status: backend/web inventory/counts, upgrade/restore and browser flows pass in disposable environments; native/toolchain and production/SaaS lifecycle gates remain open
+Current milestone: physical counts and supplier quantity purchasing verified; supplier bills/payments next
+Status: backend/web inventory/counts/purchasing, upgrade/restore and browser flows pass in disposable environments; native/toolchain and production/SaaS lifecycle gates remain open
 
 ## Scope and architecture
 
 Independent restaurant businesses are separate tenants. The current shared backend uses explicitly registered database-per-tenant runtimes; each tenant currently has one outlet. No public signup, subscription control plane or multi-outlet memberships exist. Architecture trade-off: D-008. Full contract: `../../PRODUCT.md`. Foundation spec: `FOUNDATION.md`; execution plan: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
+
+## Supplier quantity purchasing — 2026-10-18
+
+- Continued from physical-count checkpoint `86ab211` on `feat/supplier-purchasing`; backend increment `a690214`. Spec `PURCHASING.md`. Earlier branches retained, no merge/promotion/push.
+- V9 adds suppliers, quantity purchase orders and immutable partial-delivery receipts. Creating orders never changes stock. Each accepted delivery atomically increments received quantities and ingredient balances, appends linked PURCHASE_RECEIPT movements and records staff/audit evidence. Explicitly closing an OPEN order ends the unreceived remainder without reversing delivered stock. V1–V8 unchanged.
+- HTTP covers normalized supplier/order/receipt replay, concurrent identity deduplication, stale/overdelivery/numeric atomic rollback, competing close/receive version winners, role denials and independent businesses reusing IDs. Supplier directory is create/read only in this first scope; pricing, bills/payments, edit/deactivation, returns, tax and valuation are not implied.
+- Dedicated web Supplier purchasing workspace supports supplier creation/directory, reviewed quantity orders/deliveries/closure, history/ID recovery and business-scoped exact pending commands. New receipt drafts capture observed ingredient/order versions; stale recovery requires explicit reload. Mobile detail navigation scrolls to the selected order.
+- Final gate passes30 acceptance cases (28 core + fresh environment + restore), V5→V9 legacy bill preservation, startup identity and database-role probes, and12 REA scenarios. Procurement desktop35/narrow-recovery11/stale-recovery10 steps include initial state. Browser ordered100g, received40g+20g and closed40g unreceived; stock rose30g→90g. Exact receipt replay after closure did not duplicate stock; another1g manual receipt caused a stale pending delivery to reject with no partial document.
+- Real restore preserves supplier/order/receipt/closure, links and exact creation/delivery/close replay. Evidence `verification/.artifacts/counterline-verify-42a074bd3669/`; log `.local/purchasing-final-gate.log`. Reviewed desktop and390px screenshots; no native/Safari/device claim. Host web production build and explicit offline-host backend packaging succeeded; no default container-build/remote CI claim.
+- Development/staging remain stopped on unchanged V5 image objects/volumes/credentials. Current inventory/count/purchasing code is local feature work, not promoted. Final feature packaging/custom schedules stay deferred.
 
 ## Physical stock counts — 2026-10-18
 
@@ -52,11 +62,11 @@ Both development and staging Compose stacks, including their databases, were sto
 
 ## Remaining product / release gates
 
-- Complete purchasing/supplier/payable and stock valuation/expiry/reversal policies; expenses/shifts/reconciliation; customer consent/loyalty; offline durable outbox, registered devices and synchronization. Existing recipes/manual receiving/waste are the current connected increment, not the complete purchasing product.
+- Complete supplier bills/payments, procurement pricing/supplier lifecycle/returns and stock valuation/expiry/reversal policies; expenses/shifts/reconciliation; customer consent/loyalty; offline durable outbox, registered devices and synchronization. Existing recipes/manual receiving/waste are the current connected increment, not the complete purchasing product.
 - SaaS tenant lifecycle/subscriptions, large-fleet provisioning/migration/pooling, multi-outlet authorization and hosted deployment.
 - Separate runtime/migrator DB privileges, TLS/ingress/proxy trust, secret rotation, MFA/recovery/idle policy, production monitoring, encrypted/off-host retention and measured recovery objectives, accounting/fiscal rules, security/load/accessibility and hardware validation.
 - Complete native menu choices/check/admin/history/KDS workflows and real builds/devices. Android SDK and Mac/Xcode/signing remain unresolved. Native default tenant URL sources changed, but neither client is claimed built or device-tested.
 
 ## Next action
 
-Continue supplier setup → purchase ordering → partial delivery receiving into the verified ledger, then supplier bills/outstanding payments before expenses/shift control. Physical stock counts are complete for the bounded web/backend scope. Keep explicit cancellation/reversal and multi-outlet policies rather than guessing physical stock returns. Resume/promote user environments only when requested. CI remains configured but unexecuted remotely; hosted SaaS/security/native gates remain required.
+Next connected increment: supplier bills → partial payment recording → outstanding/overdue balances, linked to suppliers/orders without receiving stock again. Define duplicate bill references, dates, credits/voids and payment attribution before implementation; do not infer payable money from quantity-only orders or claim payment processing. Then expenses/shift control. Physical counts and quantity procurement are complete for their bounded web/backend scopes. Keep explicit cancellation/reversal and multi-outlet policies rather than guessing physical stock returns. Resume/promote user environments only when requested. CI remains configured but unexecuted remotely; hosted SaaS/security/native gates remain required.

@@ -12,12 +12,13 @@ Full delivery contract: `PRODUCT.md`. Current evidence: `docs/roadmap/STATE.md`.
 - Floor/table setup, occupancy, running checks, multiple immutable kitchen batches, transfers and exact amount-based split cash payments. First payment locks dish additions; full settlement releases the table independently of kitchen progress. Guest/item splits, refunds and voids are not implemented.
 - Ingredient stock/low-stock setup, receiving/waste/explained adjustments, immutable movement history and versioned base/variant/add-on recipes. Accepted food submissions consume stock once; previews and persisted shortage/coverage warnings allow ordering and expose negative balances. Owner/manager administration is connected to cashier ordering.
 - Physical stock counting with reviewed variances, atomic ledger corrections, immutable history, stale-version protection and retry/known-ID recovery.
+- Supplier directory, quantity purchase orders, partial deliveries into stock and explicit closing of unreceived remainders. Immutable delivery evidence, stale-version guards and exact retry recovery; no supplier prices/bills/payments are implied.
 - Price-free KDS with queued → preparing → ready → served and guarded retries.
 - Explicit `/t/{business-code}/api` routing to separately configured tenant databases. Staff sessions and browser recovery journals are tenant-scoped; no global `/api` fallback. Two-business isolation and tenant/environment database-binding checks run in the acceptance suite.
 - Disposable real PostgreSQL HTTP verification plus a backup-to-fresh-database restore drill. REA observes desktop, 390px receipt recovery and tenant-switch workflows.
 - Separate loopback-only staging configuration and local promotion of the exact verified images. CI configuration exists; it has not run remotely and does not deploy.
 
-This is not the completed product. Supplier/purchase-order/payable workflows, stock valuation/expiry/reversals, business control, loyalty, offline operation, SaaS lifecycle administration, multiple outlets per business and full native parity remain required. Manual stock receiving is not the whole purchasing module. Operational/security/tax/hardware release gates are explicit in `docs/OPERATIONS.md`.
+This is not the completed product. Supplier bills/payments, procurement pricing/returns, stock valuation/expiry/reversals, business control, loyalty, offline operation, SaaS lifecycle administration, multiple outlets per business and full native parity remain required. Manual stock receiving is not the whole purchasing module. Operational/security/tax/hardware release gates are explicit in `docs/OPERATIONS.md`.
 
 ## Local development with Docker
 
@@ -95,7 +96,7 @@ Both native clients retain their complete server base URL with checkout IDs and 
 
 ## Git workflow
 
-The application has its own local Git repository. `main` retains the honest initial source snapshot; the verified foundation was fast-forwarded to `main`; inventory is retained on `feat/inventory-recipes`; its physical-count continuation is on `feat/stock-reconciliation`. Make small feature-scoped commits after relevant verification, not fabricated retrospective commits or one final giant commit. No remote or push is configured/authorized. Merge only after the branch's release gates pass and the intended release scope is reviewed.
+The application has its own local Git repository. `main` retains the honest initial source snapshot; the verified foundation was fast-forwarded to `main`; inventory is retained on `feat/inventory-recipes`; its physical-count continuation is on `feat/stock-reconciliation`; current supplier purchasing work is on `feat/supplier-purchasing`. Make small feature-scoped commits after relevant verification, not fabricated retrospective commits or one final giant commit. No remote or push is configured/authorized. Merge only after the branch's release gates pass and the intended release scope is reviewed.
 
 ## Important limits
 

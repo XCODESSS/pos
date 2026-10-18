@@ -1,5 +1,31 @@
 # Findings
 
+## 2026-10-18 — Supplier quantity purchasing and partial deliveries
+
+User asked to continue to the next workflow after physical counts. Started `feat/supplier-purchasing` from count checkpoint `86ab211`. Spec `PURCHASING.md`; backend commit `a690214`. The initial supplier/order/delivery test failed404 before implementation; the close-remainder test failed404 before adding its route/rules. Additive V9 preserves all earlier migration files.
+
+Known-correct quantity behavior: creating a1000g order changes no stock;400g then600g receipts produce exactly1000g and RECEIVED status. Concurrent command retries deduplicate suppliers/orders/deliveries; reordered lines have the same identity. Changed intent rejects. Stale stock, overdelivery, invalid quantities and stock-limit failures leave the entire document/stock unchanged. Competing receipt/close commands have one version winner. Closing a partly received order retains stock and permits exact receipt recovery, but no new receipt. Cashier/kitchen are denied, manager succeeds; alpha/beta reuse supplier/ingredient/order IDs without sharing units, balances or status.
+
+Final full command: `node verification/run.mjs --host-backend --upgrade-from=counterline-backend:9cb1e27 --browser` with installed REA/Chrome paths. All30 acceptance cases (28 core + fresh environment + restore), V5→V9 legacy-bill preservation, startup identity mismatches and cross-database role denial passed. Restore preserves supplier/order, partial receipt, closed remainder, stock link and deduplicated creation/delivery/close replay, alongside all prior money/count/recipe/session facts. TypeScript production build passed. Explicit host-offline JDK build packaged in Docker; no new default-container/remote CI/native verification claim.
+
+REA desktop created Browser dairy supplier, ordered100g, received40g then20g, then explicitly closed40g unreceived. Stock30g→70g→90g. Both immutable delivery documents and staff-linked ledger increases matched public postconditions. Narrow browser recovery replayed the first receipt after closure with no duplicate stock and cleared its pending journal. A separate retained delivery became stale after another1g receipt, was rejected, and required explicit reload; no partial delivery existed. Reviewed desktop/390px screenshots; not physical phones or Safari.
+
+Full ignored artifacts `verification/.artifacts/counterline-verify-42a074bd3669/`; log `.local/purchasing-final-gate.log`. All12 scenarios completed; counts include initial state:
+- Front desk46: `ev_3fc61bfb09486d582852ed170432a4dd8845be1a19182aa6342e8a58645ccfdb`.
+- Narrow9: `ev_36e6112ea7258e9756a4af68df554bfb7b6c7966e92990cbc711d854a43f3e66`.
+- Tenant switch6: `ev_0dfad272137b5f0564fddcdc6a868398f49eb5782c7db9e5a6e08af30f5fcf6a`.
+- Inventory setup30: `ev_342ee3d08afa5ed8b025e4042a1456a91fa9e495b44e56e1ce972647ffb86e84`.
+- Inventory workflow39: `ev_2b3acf5cf84248f5a8233b2808aac5f3f76c8831a8a1b7d7980fde6783681210`.
+- Inventory narrow8: `ev_8016cb5ffab39590d4baa6b9e244abea2051f55a210db8527ccbf4ceade03499`.
+- Count19: `ev_c9ec307a6b1f22c28bb68f91743d219e344934d5db6105a3dc8d54c40e5fea8d`.
+- Stale count19: `ev_33a27f6e6199f589a1043bb751110fb3ffe02688205994cc1cd62886eeb28399`.
+- Narrow count11: `ev_8d60770818a3cbbcb10e6919e86cf62d0ece69a945658499e241692909278be3`.
+- Purchasing35: `ev_e0a37a9f55a9026d09080a7a9f2409e0566eeaf3210ce5be462ce0d8ef740554`.
+- Narrow purchasing11: `ev_8796ad20147f7755e824c23065ca8d33ab2cbee9973b1e76d11150c45b7bec74`.
+- Stale purchasing10: `ev_0f53a12fede8798b02fefa80051779e8f32d03b7d9c97ea88b4fe3d694fb5baa`.
+
+No development/staging restart, data promotion, push or real money processing. Supplier directory currently supports creation/read, not edits/deactivation. Purchase prices, supplier bills/payments, taxes, returns, valuation, expiry/lots and native parity remain required later work. Final plan packaging and custom review schedules remain deferred.
+
 ## 2026-10-18 — Physical stock reconciliation
 
 Continued from inventory `2811b31` on local `feat/stock-reconciliation`. First count HTTP test returned404 before implementation; after additive V8/module integration it passed. Expanded public regression cases cover immutable variance, zero-variance observations, concurrent/reordered exact replay, changed intent, stale multi-line atomic rejection, submission/count races, negative-stock numeric bounds, roles and tenants. Existing migrations unchanged; no stock/payments inferred from historical counts.

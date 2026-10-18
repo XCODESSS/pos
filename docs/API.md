@@ -24,6 +24,11 @@ At the server root only: `GET /health` returns liveness/mode/environment; `GET /
 | GET | `/inventory/counts/{id}` | Immutable count recovery by UUID |
 | GET / POST | `/inventory/recipes` | Current/historical recipe revision / guarded new revision |
 | POST | `/orders/stock-preview` | Cashier/manager stock warnings, no reservation or deduction |
+| GET / POST | `/purchasing/suppliers` | Supplier directory / retry-safe creation |
+| GET / POST | `/purchasing/orders` | Paged purchase history / quantity order creation |
+| GET | `/purchasing/orders/{id}` | Order with immutable delivery receipts |
+| POST | `/purchasing/orders/{id}/receipts` | Atomic partial delivery and linked stock increases |
+| POST | `/purchasing/orders/{id}/close` | Explicitly close unreceived remainder without stock reversal |
 | GET | `/tables` | All floor/table records with current open check ID |
 | POST | `/admin/tables`, `/admin/tables/{id}` | Owner/manager table create / versioned update |
 | POST | `/checks` | Open a table visit |
@@ -124,6 +129,22 @@ Response `{id,sequence,reason,actorId,createdAt,lines:[{ingredientId,ingredientN
 Any stale ingredient version returns 409 for the whole count; reload and review/recount, never silently rebase old quantities. Exact UUID/normalized-intent replay returns the original count before live-version checks, even after later activity. Changed intent under the same UUID returns 409. Line ordering does not change intent. Counts do not rewrite order/recipe snapshots, payments or sales.
 
 GET `/inventory/counts?limit=10&before=SEQUENCE` returns `{counts,nextCursor}`, newest first, default 25/max 100. GET `/inventory/counts/{id}` recovers a known count. The web retains unconfirmed commands in business-scoped session storage and supports explicit confirmation, unchanged retry and known-ID recovery. Drafts are not a stock reservation/freeze; coordinate physical counting with service. No schedules, approvals or valuation are implied.
+
+## Supplier purchasing (quantity commitments)
+
+Owner/manager only via STOCK_READ/STOCK_MANAGE. This module tracks quantities, not supplier prices, payable invoices, taxes, payment or valuation. Orders never implicitly receive stock. Do not duplicate an order-linked delivery through the manual receiving route.
+
+Supplier creation: `POST /purchasing/suppliers` `{id,name,contact}`; canonical UUID, printable name1..80, optional contact0..120, at most500 suppliers, case-insensitive unique name. Exact creation replay succeeds; changed intent/name collision409. GET returns `{suppliers}`. Supplier edits/deactivation are not yet implemented.
+
+Order creation: `POST /purchasing/orders` `{id,supplierId,reference,lines:[{ingredientId,quantityMilli}]}`. Reference1..80 printable;1..100 unique ingredients; positive integer-thousandth quantities ≤1,000,000,000,000. Snapshots supplier/ingredient names and units. Exact normalized request replay returns the current order, including later deliveries/closure; conflicting ID409. Reordered lines are equivalent.
+
+An order has `{id,sequence,supplierId,supplierName,reference,actorId,createdAt,version,status,lines,closeReason,closedBy,closedAt}`. Lines contain `{ingredientId,ingredientName,unit,orderedMilli,receivedMilli}`. Status OPEN, RECEIVED (all ordered quantities received), or CLOSED (explicitly closed remainder). GET `/purchasing/orders?limit=20&before=SEQUENCE` returns `{orders,nextCursor}` newest first, default20/max100. GET `/purchasing/orders/{id}` returns a consistent `{order,receipts}` aggregate. Issued quantities cannot be edited/deleted/reopened in this scope.
+
+Delivery: POST `/purchasing/orders/{id}/receipts` `{id,expectedVersion,reference,lines:[{ingredientId,expectedStockVersion,quantityMilli}]}`. Receive1..100 unique ordered ingredients, positive quantities no greater than the unreceived remainder, at most100 receipts/order. Reference1..80 printable. Any stale order/ingredient, overdelivery, foreign ingredient or stock-bound failure rejects the whole transaction. Do not silently substitute new versions into a pending delivery. Reload and review after409.
+
+Receipt response `{id,sequence,purchaseOrderId,reference,actorId,createdAt,lines:[{ingredientId,ingredientName,unit,quantityMilli,balanceMilli}]}` is immutable. Each delivered line creates a PURCHASE_RECEIPT stock movement with nullable `purchaseReceiptId` linking it to this document. The order version/received quantities, all stock increases, receipt and audit commit together. Exact UUID/normalized-intent replay returns original receipt evidence even after later stock changes or order closure; changed intent409.
+
+Close remainder: POST `/purchasing/orders/{id}/close` `{id,expectedVersion,reason}`; reason1..200 printable. Only an OPEN order at the observed version may close. Exact command replay recovers the closed order; stale or changed intent409. It retains received quantities, original commitments and close actor/time/reason. Closing does not return goods, cancel a supplier bill, pay money or reverse any ledger movement. Financial corrections/returns need a separate explicit workflow.
 
 ## History, kitchen and reports
 

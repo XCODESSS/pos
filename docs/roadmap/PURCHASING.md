@@ -21,12 +21,12 @@ This increment tracks quantity commitments and physical deliveries. It does NOT 
 
 ## Work checklist
 
-- [ ] First public red/green: supplier → order with no stock effect → partial delivery updates remaining quantity and ledger once.
-- [ ] Replay/concurrent/stale/overdelivery/rollback/close/role/tenant and numeric coverage.
-- [ ] Connected web Purchasing workspace with supplier/order creation, partial delivery, explicit close remainder, history/recovery.
-- [ ] Restore preserves purchase order/receipt/link and safe replay; V5 upgrade remains passing.
-- [ ] REA observed purchase/partial receipt/close and narrow recovery; inspect screenshots; full gate.
-- [ ] API/product/state evidence and small verified commits. Native purchasing parity remains an open release gate.
+- [x] First public red/green: supplier → order with no stock effect → partial delivery updates remaining quantity and ledger once.
+- [x] Replay/concurrent/stale/overdelivery/rollback/close/role/tenant and numeric coverage.
+- [x] Connected web Purchasing workspace with supplier/order creation, partial delivery, explicit close remainder, history/recovery.
+- [x] Restore preserves purchase order/receipt/link and safe replay; V5 upgrade remains passing.
+- [x] REA observed purchase/partial receipt/close and narrow recovery; inspect screenshots; full gate.
+- [x] API/product/state evidence and small verified commits. Native purchasing parity remains an open release gate.
 
 ## Files
 
