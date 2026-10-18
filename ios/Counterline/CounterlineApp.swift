@@ -32,10 +32,23 @@ struct CounterView: View {
                     if let order = model.order {
                         Text(order.bill.billNumber).font(.title2.bold())
                         Text("Takeaway · \(order.status)").font(.subheadline)
-                        List(order.bill.lines) { line in
-                            HStack {
-                                VStack(alignment: .leading) { Text(line.name); Text("Quantity: \(line.quantity)").font(.caption).foregroundStyle(.secondary) }
-                                Spacer(); Text(money(line.subtotalPaise))
+                        List {
+                            if let stock = order.inventory {
+                                if !stock.warnings.isEmpty || !stock.missingRecipes.isEmpty {
+                                    Text("Stock at submission · warnings do not block ordering").foregroundStyle(.orange)
+                                }
+                                ForEach(stock.warnings) { warning in
+                                    Text("\(warning.name): needs \(stockQuantity(warning.requiredMilli, warning.unit)), available \(stockQuantity(warning.availableMilli, warning.unit)), shortage \(stockQuantity(warning.shortageMilli, warning.unit)).").font(.caption)
+                                }
+                                if !stock.missingRecipes.isEmpty {
+                                    Text("Recipe coverage missing: " + stock.missingRecipes.map { $0.label }.joined(separator: "; ")).font(.caption)
+                                }
+                            }
+                            ForEach(order.bill.lines) { line in
+                                HStack {
+                                    VStack(alignment: .leading) { Text(line.name); Text("Quantity: \(line.quantity)").font(.caption).foregroundStyle(.secondary) }
+                                    Spacer(); Text(money(line.subtotalPaise))
+                                }
                             }
                         }.listStyle(.plain)
                         LabeledContent("Subtotal", value: money(order.bill.subtotalPaise))

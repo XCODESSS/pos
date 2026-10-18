@@ -51,6 +51,17 @@ private fun Counter(model: PosViewModel) {
                 Text(order.bill.billNumber, style = MaterialTheme.typography.titleLarge)
                 Text("Takeaway · ${order.status}")
                 LazyColumn(Modifier.weight(1f)) {
+                    order.inventory?.let { snapshot ->
+                        if (snapshot.warnings.isNotEmpty() || snapshot.missingRecipes.isNotEmpty()) item {
+                            Text("Stock at submission · warnings do not block ordering", color = MaterialTheme.colorScheme.error)
+                        }
+                        items(snapshot.warnings, key = { "stock-warning:${it.ingredientId}" }) { warning ->
+                            Text("${warning.name}: needs ${stockQuantity(warning.requiredMilli, warning.unit)}, available ${stockQuantity(warning.availableMilli, warning.unit)}, shortage ${stockQuantity(warning.shortageMilli, warning.unit)}.")
+                        }
+                        if (snapshot.missingRecipes.isNotEmpty()) item {
+                            Text("Recipe coverage missing: " + snapshot.missingRecipes.joinToString { it.label })
+                        }
+                    }
                     items(order.bill.lines, key = { it.itemId }) { line ->
                         ListItem(headlineContent = { Text(line.name) }, supportingContent = { Text("Quantity: ${line.quantity}") }, trailingContent = { Text(money(line.subtotalPaise)) })
                     }

@@ -66,4 +66,6 @@ A desktop Chrome viewport capture is useful for layout review but is not a real 
 
 Every native server base URL must include `/t/{business-code}`; the default development code is `demo`. The complete base URL is retained with checkout recovery IDs and must match before recovery. Old unscoped journals require explicit authorized recovery through the demo web workspace, not automatic tenant reassignment.
 
+Native counter sources now also decode/display the server's recorded shortage and missing-recipe warnings after a submission. They do not yet implement live stock previews or inventory/recipe administration. Android was retried for this change and again stopped before compilation at missing SDK location; SwiftUI/Xcode remains unavailable. This is source work, not a native build/device success.
+
 The native authentication sources now use individual login, sign-out and session-revocation handling, but have not been compiled or run after those changes. They currently expose the initial takeaway checkout only; kitchen-only staff must use the web KDS until native kitchen screens exist. The new order history and KDS workspaces are implemented on the web; all clients' newly created orders receive a server-side kitchen ticket. Native workspace parity is a later task, not a verified feature today.

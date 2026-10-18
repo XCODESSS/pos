@@ -26,7 +26,10 @@ import java.util.Locale
     val id: String, val billNumber: String, val lines: List<BillLine>,
     val subtotalPaise: Long, val cgstPaise: Long, val sgstPaise: Long, val totalPaise: Long,
 )
-@Serializable data class Order(val bill: Bill, val status: String)
+@Serializable data class StockWarning(val ingredientId: String, val name: String, val unit: String, val requiredMilli: Long, val availableMilli: Long, val shortageMilli: Long)
+@Serializable data class RecipeGap(val label: String)
+@Serializable data class StockSnapshot(val warnings: List<StockWarning>, val missingRecipes: List<RecipeGap>)
+@Serializable data class Order(val bill: Bill, val status: String, val inventory: StockSnapshot? = null)
 @Serializable data class CashPayment(val receivedPaise: Long)
 @Serializable data class SalesReport(val date: String, val paidOrders: Long, val totalPaise: Long)
 @Serializable data class ApiError(val message: String)
@@ -69,5 +72,6 @@ class PosApi {
     }
     fun close() = client.close()
 }
+fun stockQuantity(milli: Long, unit: String): String = java.math.BigDecimal.valueOf(milli, 3).stripTrailingZeros().toPlainString() + " " + unit.lowercase(Locale.ROOT)
 fun money(paise: Long): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN"))
     .format(java.math.BigDecimal.valueOf(paise, 2))

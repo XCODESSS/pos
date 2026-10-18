@@ -33,7 +33,14 @@ struct Bill: Decodable {
     let sgstPaise: Int64
     let totalPaise: Int64
 }
-struct Order: Decodable { let bill: Bill; let status: String }
+struct StockWarning: Decodable, Identifiable {
+    let ingredientId: String; let name: String; let unit: String
+    let requiredMilli: Int64; let availableMilli: Int64; let shortageMilli: Int64
+    var id: String { ingredientId }
+}
+struct RecipeGap: Decodable { let label: String }
+struct StockSnapshot: Decodable { let warnings: [StockWarning]; let missingRecipes: [RecipeGap] }
+struct Order: Decodable { let bill: Bill; let status: String; let inventory: StockSnapshot? }
 struct CashPayment: Encodable { let receivedPaise: Int64 }
 struct SalesReport: Decodable { let date: String; let paidOrders: Int; let totalPaise: Int64 }
 struct APIErrorBody: Decodable { let message: String }
@@ -79,6 +86,11 @@ struct PosAPI {
         }
         return try JSONDecoder().decode(T.self, from: data)
     }
+}
+
+func stockQuantity(_ milli: Int64, _ unit: String) -> String {
+    let amount = NSDecimalNumber(decimal: Decimal(milli) / 1000).stringValue
+    return "\(amount) \(unit.lowercased())"
 }
 
 func money(_ paise: Int64) -> String {
