@@ -69,3 +69,11 @@ The user confirmed independent-business SaaS. One restaurant business is one ten
 Rationale: strong data separation without retrofitting scope predicates into every prototype query or rewriting the product modules. Separate nonsuperuser database roles also deny cross-database CONNECT. Trade-off: per-tenant provisioning, migration, connection and backup overhead; this is not automated onboarding or a production SaaS control plane. The initial registry is bounded to 32 tenants and three connections per pool per application instance. Existing development data is assigned to the demo business, never copied to staging. Startup migrations still use each database-owning role; separate migration/runtime privileges remain a production-hardening gate.
 
 Revisit before a large fleet, dynamic onboarding, multi-outlet authorization or horizontal deployment requires a control plane. Shared-schema tenancy would require an explicit migration and enforced isolation, never merely trusting a client-supplied tenant field. Verification uses two businesses with identical usernames/menu IDs, cross-token/ID denials, isolated reports and startup identity-mismatch probes.
+
+## D-009 — Insufficient stock warns rather than blocks
+
+Date: 2026-10-18. Status: accepted (explicit user choice); inventory implementation pending.
+
+When a recipe-backed kitchen submission requires more stock than recorded, show an ingredient-specific shortage warning and allow otherwise authorized staff to continue without manager approval. Record the full consumption exactly once and expose any resulting negative balance; do not clamp balances to zero, invent stock receipts or silently skip deductions.
+
+Rationale: recorded quantities can lag physical stock; avoid interrupting service while inventory tracking is established. Trade-off: the system may record negative stock and requires visible reconciliation through receiving/adjustments. This policy applies only to modeled stock shortages: it does not bypass menu availability, permissions, input validation or transactional persistence failures. Strict stock blocking is not part of the initial inventory scope; revisit if the user changes the operating policy.
