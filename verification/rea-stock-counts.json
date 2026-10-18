@@ -1,0 +1,27 @@
+{
+  "browser":{"mode":"launch","executable_path":"{{CHROME}}","headless":true},
+  "start_url":{"url":"{{ORIGIN}}/t/alpha/"},
+  "environment":{"locale":"en-IN","timezone":"Asia/Kolkata","viewport":{"width":1440,"height":1050,"device_scale_factor":1}},
+  "secrets":[{"secret_id":"owner","environment_variable":"VERIFY_BROWSER_OWNER_PASSWORD"}],
+  "actions":[
+    {"step_id":"username","action":"fill","locator":{"kind":"css","selector":"#username"},"value":{"source":"literal","value":"{{BROWSER_OWNER}}"}},
+    {"step_id":"password","action":"fill","locator":{"kind":"css","selector":"#password"},"value":{"source":"secret","secret_id":"owner"}},
+    {"step_id":"signin","action":"click","locator":{"kind":"role","role":"button","name":"Sign in →"}},
+    {"step_id":"inventory","action":"click","locator":{"kind":"role","role":"button","name":"Inventory & recipes"}},
+    {"step_id":"start-count","action":"click","locator":{"kind":"role","role":"button","name":"Start physical count"}},
+    {"step_id":"ingredient","action":"select_option","locator":{"kind":"css","selector":"#count-ingredient"},"value":{"source":"literal","value":"{{INGREDIENT_ID}}"}},
+    {"step_id":"add-line","action":"click","locator":{"kind":"role","role":"button","name":"Add to count"}},
+    {"step_id":"quantity","action":"fill","locator":{"kind":"css","selector":"[aria-label='Counted quantity 1']"},"value":{"source":"literal","value":"25"}},
+    {"step_id":"reason","action":"fill","locator":{"kind":"css","selector":"#count-reason"},"value":{"source":"literal","value":"Browser closing count"}},
+    {"step_id":"review","action":"click","locator":{"kind":"role","role":"button","name":"Review stock count"}},
+    {"step_id":"variance","action":"wait_for","locator":{"kind":"css","selector":".count-review:has-text('Recorded -50 g'):has-text('Counted 25 g'):has-text('Variance 75 g')"},"state":"visible","timeout_ms":20000},
+    {"step_id":"confirm","action":"click","locator":{"kind":"role","role":"button","name":"Confirm stock count"}},
+    {"step_id":"recorded","action":"wait_for","locator":{"kind":"css","selector":".stock-counts .success-note:has-text('recorded')"},"state":"visible","timeout_ms":20000},
+    {"step_id":"history","action":"wait_for","locator":{"kind":"css","selector":".count-history .count-record:has-text('Browser closing count'):has-text('Variance 75 g')"},"state":"visible","timeout_ms":20000},
+    {"step_id":"manage","action":"click","locator":{"kind":"role","role":"button","name":"Manage ingredient Browser paneer"}},
+    {"step_id":"balance","action":"wait_for","locator":{"kind":"css","selector":".stock-balance:has-text('25 g')"},"state":"visible","timeout_ms":20000},
+    {"step_id":"ledger","action":"wait_for","locator":{"kind":"css","selector":".stock-history article:has-text('COUNT'):has-text('75 g'):has-text('Physical count:')"},"state":"visible","timeout_ms":20000},
+    {"step_id":"count-evidence","action":"click","locator":{"kind":"css","selector":"[aria-label='Recovered stock count'] h4"}}
+  ],
+  "capture":{"after_each_step":["accessibility"],"at_end":["accessibility","screenshot","url"],"events":["page-errors"]}
+}

@@ -2,9 +2,9 @@
   "browser":{"mode":"launch","executable_path":"{{CHROME}}","headless":true},
   "start_url":{"url":"{{ORIGIN}}/t/alpha/"},
   "environment":{"locale":"en-IN","timezone":"Asia/Kolkata","viewport":{"width":1440,"height":1050,"device_scale_factor":1}},
-  "secrets":[{"secret_id":"owner","environment_variable":"VERIFY_OWNER_PASSWORD"}],
+  "secrets":[{"secret_id":"owner","environment_variable":"VERIFY_BROWSER_OWNER_PASSWORD"}],
   "actions":[
-    {"step_id":"username","action":"fill","locator":{"kind":"css","selector":"#username"},"value":{"source":"literal","value":"verify-owner"}},
+    {"step_id":"username","action":"fill","locator":{"kind":"css","selector":"#username"},"value":{"source":"literal","value":"{{BROWSER_OWNER}}"}},
     {"step_id":"password","action":"fill","locator":{"kind":"css","selector":"#password"},"value":{"source":"secret","secret_id":"owner"}},
     {"step_id":"signin","action":"click","locator":{"kind":"role","role":"button","name":"Sign in →"}},
     {"step_id":"inventory","action":"click","locator":{"kind":"role","role":"button","name":"Inventory & recipes"}},

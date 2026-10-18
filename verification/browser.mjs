@@ -13,6 +13,13 @@ await access(cli); await access(chrome);
 const directory = fileURLToPath(new URL(`./.artifacts/${process.env.VERIFY_PROJECT}/`, import.meta.url));
 await mkdir(directory, { recursive: true });
 const { accessToken: token } = await login();
+// Separate browser identity avoids exhausting the HTTP suite's account login bucket.
+const browserOwner = 'browser-owner';
+process.env.VERIFY_BROWSER_OWNER_PASSWORD = uuid();
+for (const tenantPath of ['/t/alpha', '/t/beta']) {
+  const ownerToken = tenantPath === '/t/alpha' ? token : (await login(undefined, undefined, tenantPath)).accessToken;
+  assert.equal((await api('/admin/staff', { id: uuid(), username: browserOwner, password: process.env.VERIFY_BROWSER_OWNER_PASSWORD, displayName: 'Browser owner', role: 'OWNER' }, ownerToken, tenantPath)).status, 200);
+}
 await dish(token, { name: 'Browser coffee', category: 'Browser', pricePaise: 6000 });
 const tables = [];
 for (const label of ['Browser A', 'Browser B']) {
@@ -20,7 +27,7 @@ for (const label of ['Browser A', 'Browser B']) {
   assert.equal(result.status, 200); tables.push(result.data);
 }
 const template = JSON.parse(await readFile(new URL('./rea-frontdesk.json', import.meta.url), 'utf8'));
-const substitutions = { CHROME: chrome, ORIGIN: process.env.VERIFY_BASE_URL, DESTINATION_ID: tables[1].id };
+const substitutions = { CHROME: chrome, ORIGIN: process.env.VERIFY_BASE_URL, DESTINATION_ID: tables[1].id, BROWSER_OWNER: browserOwner };
 function fill(value) {
   if (typeof value === 'string') return value.replace(/\{\{([A-Z_]+)\}\}/g, (_, key) => {
     if (!(key in substitutions)) throw new Error(`Unknown scenario substitution ${key}`); return substitutions[key];
@@ -30,12 +37,19 @@ function fill(value) {
   return value;
 }
 async function capture(name, scenario) {
+  scenario = { ...scenario, actions: scenario.actions.map(action => action.action === 'wait_for_timeout' ? action : { timeout_ms: 10000, ...action }) };
   const requestFile = join(directory, `${name}-request.json`);
   const evidenceFile = join(directory, `${name}-evidence.json`);
   await writeFile(requestFile, JSON.stringify(scenario, null, 2));
   let stdout;
   try { ({ stdout } = await promisify(execFile)(process.execPath, [cli, 'capture-browser-scenario', requestFile, '--format', 'json'], { env: process.env, timeout: 180_000, maxBuffer: 20 * 1024 * 1024, windowsHide: true })); }
-  catch (cause) { if (cause.stdout) await writeFile(evidenceFile, cause.stdout); throw new Error(`REA ${name} did not complete; inspect ignored evidence (credentials are declared secrets).`); }
+  catch (cause) {
+    if (cause.stdout) await writeFile(evidenceFile, cause.stdout);
+    const secrets = (scenario.secrets ?? []).map(value => process.env[value.environment_variable]).filter(Boolean);
+    const stderr = secrets.reduce((text, secret) => text.replaceAll(secret, '<REDACTED>'), String(cause.stderr ?? ''));
+    await writeFile(join(directory, `${name}-failure.json`), JSON.stringify({ code: cause.code, killed: cause.killed, signal: cause.signal, stderr }, null, 2));
+    throw new Error(`REA ${name} did not complete (code=${cause.code}, killed=${cause.killed}, signal=${cause.signal}); inspect ignored failure/evidence artifacts.`);
+  }
   await writeFile(evidenceFile, stdout);
   const evidence = JSON.parse(stdout); const result = evidence.normalized_result;
   assert.ok(result, 'REA returned normalized browser evidence');
@@ -114,3 +128,51 @@ await capture('inventory-narrow', { ...inventoryScenario,
     { step_id: 'negative-summary', action: 'click', locator: { kind: 'css', selector: '.stock-negative-label' } },
   ],
 });
+
+const countScenario = fill(JSON.parse(await readFile(new URL('./rea-stock-counts.json', import.meta.url), 'utf8')));
+await capture('stock-count', countScenario);
+const countPage = await api('/inventory/counts?limit=10', undefined, token);
+const browserCount = countPage.data.counts.find(value => value.reason === 'Browser closing count');
+assert.ok(browserCount); assert.equal(browserCount.lines[0].recordedMilli, -50000); assert.equal(browserCount.lines[0].countedMilli, 25000);
+assert.equal(browserCount.lines[0].varianceMilli, 75000);
+assert.equal((await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id).balanceMilli, 25000);
+const countedMovements = (await api(`/inventory/movements?ingredientId=${ingredient.id}`, undefined, token)).data.movements;
+assert.equal(countedMovements.filter(value => value.stockCountId === browserCount.id).length, 1);
+const countedOrder = await api(`/orders/${stockOrder.bill.id}`, undefined, token);
+assert.equal(countedOrder.status, 200);
+assert.deepEqual(countedOrder.data.inventory, stockOrder.inventory, 'count never rewrites submission evidence');
+
+const staleScenario = { ...countScenario, actions: [
+  ...countScenario.actions.slice(0, 10),
+  { step_id: 'manage-before-confirm', action: 'click', locator: { kind: 'role', role: 'button', name: 'Manage ingredient Browser paneer' } },
+  { step_id: 'delivery-quantity', action: 'fill', locator: { kind: 'css', selector: '#stock-quantity' }, value: { source: 'literal', value: '5' } },
+  { step_id: 'delivery-reason', action: 'fill', locator: { kind: 'css', selector: '#stock-reason' }, value: { source: 'literal', value: 'Delivery during physical count' } },
+  { step_id: 'delivery', action: 'click', locator: { kind: 'role', role: 'button', name: 'Record stock movement' } },
+  { step_id: 'delivery-balance', action: 'wait_for', locator: { kind: 'css', selector: '.stock-balance:has-text("30 g")' }, state: 'visible', timeout_ms: 20000 },
+  { step_id: 'stale-confirm', action: 'click', locator: { kind: 'role', role: 'button', name: 'Confirm stock count' } },
+  { step_id: 'stale-warning', action: 'wait_for', locator: { kind: 'css', selector: '.stock-counts .error:has-text("Stock changed")' }, state: 'visible', timeout_ms: 20000 },
+  { step_id: 'explicit-reload-required', action: 'wait_for', locator: { kind: 'css', selector: '.stock-counts .workspace-notice:has-text("cannot be submitted")' }, state: 'visible', timeout_ms: 20000 },
+] };
+await capture('stock-count-stale', staleScenario);
+assert.equal((await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id).balanceMilli, 30000);
+assert.equal((await api('/inventory/counts?limit=100', undefined, token)).data.counts.filter(value => value.reason === 'Browser closing count').length, 1);
+
+// Simulate a lost response: the committed command survives in this business's session journal.
+const retryBody = { id: browserCount.id, reason: browserCount.reason, lines: browserCount.lines.map(value => ({ ingredientId: value.ingredientId, expectedVersion: value.observedVersion, countedMilli: value.countedMilli })) };
+const countNarrow = { ...countScenario,
+  capture: { ...countScenario.capture, at_end: [...countScenario.capture.at_end, 'storage'] },
+  environment: { ...countScenario.environment, viewport: { width: 390, height: 844, device_scale_factor: 1 } },
+  storage: { session_storage: [{ origin: process.env.VERIFY_BASE_URL, entries: [{ name: 'counterline.tenant.alpha.inventory.count.pending', value: { source: 'literal', value: JSON.stringify(retryBody) } }] }] },
+  actions: [...countScenario.actions.slice(0, 4),
+    { step_id: 'retry-retained', action: 'click', locator: { kind: 'role', role: 'button', name: 'Retry same stock count' } },
+    { step_id: 'retry-confirmed', action: 'wait_for', locator: { kind: 'css', selector: '.stock-counts .success-note:has-text("recorded")' }, state: 'visible', timeout_ms: 20000 },
+    { step_id: 'known-count', action: 'fill', locator: { kind: 'css', selector: '#recover-count' }, value: { source: 'literal', value: browserCount.id } },
+    { step_id: 'recover', action: 'click', locator: { kind: 'role', role: 'button', name: 'Open stock count' } },
+    { step_id: 'original-evidence', action: 'wait_for', locator: { kind: 'css', selector: '[aria-label="Recovered stock count"]:has-text("Recorded -50 g"):has-text("Counted 25 g")' }, state: 'visible', timeout_ms: 20000 },
+    { step_id: 'evidence-summary', action: 'click', locator: { kind: 'css', selector: '[aria-label="Recovered stock count"] h4' } },
+  ],
+};
+const recoveredCount = await capture('stock-count-narrow-recovery', countNarrow);
+assert.ok(!recoveredCount.steps.at(-1).artifacts.storage.value.session_storage.some(entry => entry.name === 'counterline.tenant.alpha.inventory.count.pending'), 'confirmed replay clears the pending journal');
+assert.equal((await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id).balanceMilli, 30000, 'late replay does not overwrite the subsequent delivery');
+assert.equal((await api(`/inventory/movements?ingredientId=${ingredient.id}`, undefined, token)).data.movements.filter(value => value.stockCountId === browserCount.id).length, 1);

@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { api, dish, login, uuid } from './http.mjs';
+import { api, dish, login as signIn, uuid } from './http.mjs';
+
+// These tests do not revoke the owner; reuse its session instead of consuming a sign-in per case.
+const ownerSessions = new Map();
+function login(username, password, tenantPath = '/t/alpha') {
+  if (username !== undefined || password !== undefined) return signIn(username, password, tenantPath);
+  if (!ownerSessions.has(tenantPath)) ownerSessions.set(tenantPath, signIn(undefined, undefined, tenantPath));
+  return ownerSessions.get(tenantPath);
+}
 
 async function ingredient(token, balanceMilli = 500000, tenantPath) {
   const item = await api('/inventory/ingredients', { id: uuid(), name: `Count ${uuid()}`, unit: 'G', lowStockMilli: 100000 }, token, tenantPath);
