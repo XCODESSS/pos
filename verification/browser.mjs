@@ -176,3 +176,56 @@ const recoveredCount = await capture('stock-count-narrow-recovery', countNarrow)
 assert.ok(!recoveredCount.steps.at(-1).artifacts.storage.value.session_storage.some(entry => entry.name === 'counterline.tenant.alpha.inventory.count.pending'), 'confirmed replay clears the pending journal');
 assert.equal((await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id).balanceMilli, 30000, 'late replay does not overwrite the subsequent delivery');
 assert.equal((await api(`/inventory/movements?ingredientId=${ingredient.id}`, undefined, token)).data.movements.filter(value => value.stockCountId === browserCount.id).length, 1);
+
+const beforePurchasing = (await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id);
+const purchaseScenario = fill(JSON.parse(await readFile(new URL('./rea-purchasing.json', import.meta.url), 'utf8')));
+await capture('purchasing', purchaseScenario);
+const purchasedOrder = (await api('/purchasing/orders?limit=100', undefined, token)).data.orders.find(value => value.reference === 'Browser replenishment');
+assert.ok(purchasedOrder); assert.equal(purchasedOrder.supplierName, 'Browser dairy supplier'); assert.equal(purchasedOrder.status, 'CLOSED');
+assert.equal(purchasedOrder.version, 3); assert.equal(purchasedOrder.lines[0].orderedMilli, 100000); assert.equal(purchasedOrder.lines[0].receivedMilli, 60000);
+const purchaseDetail = (await api(`/purchasing/orders/${purchasedOrder.id}`, undefined, token)).data;
+assert.equal(purchaseDetail.receipts.length, 2); assert.deepEqual(purchaseDetail.receipts.map(value => value.lines[0].quantityMilli), [40000, 20000]);
+assert.equal((await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id).balanceMilli, 90000);
+const deliveries = (await api(`/inventory/movements?ingredientId=${ingredient.id}`, undefined, token)).data.movements.filter(value => value.kind === 'PURCHASE_RECEIPT');
+assert.equal(deliveries.length, 2); assert.deepEqual(deliveries.map(value => value.deltaMilli), [20000, 40000]);
+assert.ok(deliveries.every(value => value.actorId === purchasedOrder.actorId));
+const pendingDelivery = { kind: 'receive', path: `/purchasing/orders/${purchasedOrder.id}/receipts`, orderId: purchasedOrder.id,
+  body: { id: purchaseDetail.receipts[0].id, expectedVersion: 0, reference: 'Browser delivery A', lines: [{ ingredientId: ingredient.id, expectedStockVersion: beforePurchasing.version, quantityMilli: 40000 }] },
+  summary: ['Recover the original partial delivery, not a new receipt.'],
+};
+const recoveredPurchase = await capture('purchasing-narrow-recovery', { ...purchaseScenario,
+  environment: { ...purchaseScenario.environment, viewport: { width: 390, height: 844, device_scale_factor: 1 } },
+  capture: { ...purchaseScenario.capture, at_end: [...purchaseScenario.capture.at_end, 'storage'] },
+  storage: { session_storage: [{ origin: process.env.VERIFY_BASE_URL, entries: [{ name: 'counterline.tenant.alpha.purchasing.pending', value: { source: 'literal', value: JSON.stringify(pendingDelivery) } }] }] },
+  actions: [...purchaseScenario.actions.slice(0, 4),
+    { step_id: 'retry', action: 'click', locator: { kind: 'role', role: 'button', name: 'Retry same purchase action' } },
+    { step_id: 'recovered', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail .purchase-status:has-text("CLOSED")' }, state: 'visible', timeout_ms: 20000 },
+    { step_id: 'known-id', action: 'fill', locator: { kind: 'css', selector: '#recover-purchase' }, value: { source: 'literal', value: purchasedOrder.id } },
+    { step_id: 'open-id', action: 'click', locator: { kind: 'role', role: 'button', name: 'Open purchase order' } },
+    { step_id: 'unchanged-quantity', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail:has-text("Received 60 g"):has-text("Closed unreceived 40 g")' }, state: 'visible', timeout_ms: 20000 },
+    { step_id: 'summary', action: 'click', locator: { kind: 'css', selector: '.purchase-detail .workspace-notice' } },
+  ],
+});
+assert.ok(!recoveredPurchase.steps.at(-1).artifacts.storage.value.session_storage.some(entry => entry.name === 'counterline.tenant.alpha.purchasing.pending'));
+assert.deepEqual((await api(`/purchasing/orders/${purchasedOrder.id}`, undefined, token)).data, purchaseDetail);
+const afterPurchasing = (await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id);
+assert.equal(afterPurchasing.balanceMilli, 90000);
+const stalePurchaseId = uuid();
+assert.equal((await api('/purchasing/orders', { id: stalePurchaseId, supplierId: purchasedOrder.supplierId, reference: 'Stale receiving fixture', lines: [{ ingredientId: ingredient.id, quantityMilli: 100000 }] }, token)).status, 200);
+const staleDelivery = { ...pendingDelivery, orderId: stalePurchaseId, path: `/purchasing/orders/${stalePurchaseId}/receipts`, body: { id: uuid(), expectedVersion: 0, reference: 'Stale receiving attempt', lines: [{ ingredientId: ingredient.id, expectedStockVersion: afterPurchasing.version, quantityMilli: 10000 }] } };
+assert.equal((await api(`/inventory/ingredients/${ingredient.id}/movements`, { id: uuid(), expectedVersion: afterPurchasing.version, kind: 'RECEIPT', quantityMilli: 1000, reason: 'Other delivery while purchase draft was pending' }, token)).status, 200);
+await capture('purchasing-stale-recovery', { ...purchaseScenario,
+  storage: { session_storage: [{ origin: process.env.VERIFY_BASE_URL, entries: [
+    { name: 'counterline.tenant.alpha.purchasing.pending', value: { source: 'literal', value: JSON.stringify(staleDelivery) } },
+    { name: 'counterline.tenant.alpha.purchasing.selected', value: { source: 'literal', value: stalePurchaseId } },
+  ] }] },
+  actions: [...purchaseScenario.actions.slice(0, 4),
+    { step_id: 'retry-stale', action: 'click', locator: { kind: 'role', role: 'button', name: 'Retry same purchase action' } },
+    { step_id: 'stale-rejected', action: 'wait_for', locator: { kind: 'css', selector: '.purchasing-workspace .error:has-text("Stock changed")' }, state: 'visible', timeout_ms: 20000 },
+    { step_id: 'explicit-review', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail .workspace-notice:has-text("Reload and review")' }, state: 'visible', timeout_ms: 20000 },
+    { step_id: 'reload', action: 'click', locator: { kind: 'role', role: 'button', name: 'Discard delivery draft and reload' } },
+    { step_id: 'no-receipt', action: 'wait_for', locator: { kind: 'css', selector: '.delivery-history:has-text("No deliveries recorded")' }, state: 'visible', timeout_ms: 20000 },
+  ],
+});
+assert.equal((await api(`/purchasing/orders/${stalePurchaseId}`, undefined, token)).data.receipts.length, 0);
+assert.equal((await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id).balanceMilli, 91000);
