@@ -16,6 +16,12 @@ At the server root only: `GET /health` returns liveness/mode/environment; `GET /
 | GET | `/menu` | Available dishes, choices, prices and versions |
 | GET / POST | `/admin/menu` | Owner/manager full catalog / creation |
 | POST | `/admin/menu/{id}` | Versioned menu update |
+| GET | `/inventory` | Owner/manager ingredients, balances and low-stock state |
+| POST | `/inventory/ingredients`, `/inventory/ingredients/{id}` | Ingredient setup / versioned metadata |
+| POST | `/inventory/ingredients/{id}/movements` | Retry-safe receiving, waste or signed adjustment |
+| GET | `/inventory/movements` | Ingredient-scoped immutable movement history |
+| GET / POST | `/inventory/recipes` | Current/historical recipe revision / guarded new revision |
+| POST | `/orders/stock-preview` | Cashier/manager stock warnings, no reservation or deduction |
 | GET | `/tables` | All floor/table records with current open check ID |
 | POST | `/admin/tables`, `/admin/tables/{id}` | Owner/manager table create / versioned update |
 | POST | `/checks` | Open a table visit |
@@ -39,6 +45,8 @@ Login body: `{"username":"owner","password":"<operator-supplied password>"}`. Re
 | --- | --- | --- | --- | --- |
 | Menu/receipts/checks/cash/reports | yes | yes | yes | no |
 | Table administration | yes | yes | no | no |
+| Inventory/recipes/full stock history | yes | yes | no | no |
+| Order stock preview/submission snapshot | yes | yes | yes | no |
 | Kitchen feed | yes | yes | read-only | yes |
 | Kitchen progress | yes | yes | no | yes |
 | Menu administration | yes | yes | no | no |
@@ -88,6 +96,22 @@ Cash: `{id,expectedVersion,amountPaise}`, positive and no more than the outstand
 Check commands persist exact intent/fingerprint. Replays return the latest aggregate without repeating the mutation, even if later commands have advanced/closed it; a reused command ID with different intent returns 409. New commands must use the observed version. Refresh/review after 409; never silently substitute a new version into an uncertain command.
 
 `RunningCheck` includes `{id,number,table,version,createdAt,closedAt,status,batches,payments,totalPaise,paidPaise,duePaise}`. Status: OPEN before payments, SETTLING after partial payment, CLOSED after settlement/empty release. Payments contain ID, amount, time and receiving staff ID. Batch paid flags are updated together only at full settlement; the immutable bill snapshots do not change.
+
+## Inventory and recipes
+
+Ingredients: `POST /inventory/ingredients` with `{id,name,unit,lowStockMilli}`; units `G`, `ML`, `EACH` are immutable. IDs are canonical UUIDs; names are case-insensitively unique per tenant and at most80 printable characters. Quantities are integer **thousandths of the displayed base unit** (`quantityMilli=75000` means75g when unitG), not paise. UI accepts three decimals; no implicit kg/litre conversion. Maximum500 ingredients; thresholds0..1,000,000,000,000 milliunits. An `Ingredient` has `{id,name,unit,lowStockMilli,balanceMilli,version,lowStock}`; it starts at zero. Update only `{expectedVersion,name,lowStockMilli}`; stock/metadata changes increment its version.
+
+Manual movement body: `{id,kind,quantityMilli,reason,reference,expectedVersion}`. Kinds RECEIPT/WASTE require positive quantities; ADJUSTMENT accepts a signed nonzero delta. WASTE subtracts the positive amount. Opening stock is an explained ADJUSTMENT, never an unrecorded direct balance setter. Reason1..200 printable characters; reference is optional, ≤80. Amounts/balances remain within ±1,000,000,000,000 milliunits; negative stock is allowed, numeric overflow is not. Same command ID + normalized intent recovers its immutable movement/current ingredient; changed intent/stale versions return409. Response `{ingredient,movement}`.
+
+History: `GET /inventory/movements?ingredientId=UUID&limit=25&before=SEQUENCE`. Defaultlimit50, maximum100; positive sequence cursor, newest first. Response `{movements,nextCursor}`. Each movement records ingredient/name/unit snapshots, signed delta/resulting balance, kind, command ID or linked order ID, reason/reference, actor ID and time. Neither receiving nor waste/adjustment rewrites an earlier event. Receiving here is not a supplier payable or purchase-order workflow.
+
+Recipes: POST `{itemId,kind,choiceId,expectedVersion,components:[{ingredientId,quantityMilli}]}`. Kinds BASE (null choice), VARIANT and ADDON (valid choice belonging to the dish). Up to40 unique ingredients; positive quantity ≤1,000,000,000 milliunits per serving. Variant recipes **replace** BASE; selected add-on recipes add requirements for each serving. There is no inferred size multiplier. Read `/inventory/recipes?itemId=...&kind=BASE` or add choiceId/version. Unmapped current recipe returnsversion0/empty components; first save produces1; later revisions append. Exact immediate save replay is safe; conflicting stale writes return409. A historical version remains readable. Empty components clear future coverage without erasing prior revisions.
+
+Preview body `{lines:[CartLine]}` uses normal menu/quantity validation and returns `{requirements,warnings,missingRecipes,recipes}`. Requirements aggregate per ingredient; warnings expose requiredMilli/availableMilli/shortageMilli with name/unit. Recipes identify target, revision and serving count. Preview reserves nothing; amounts can change before acceptance. Owner/manager have full stock access; cashiers can preview/see submission evidence but cannot administer ingredients/recipes or inspect the full ledger.
+
+New standalone orders and check batches atomically commit recipe consumption, stock warning snapshot, bill and KOT. `Order.inventory` returns that immutable StockSnapshot; migrated older bills remain `inventory:null`, never retro-deducted. Recipe changes, later receipts, payment, table transfer, preparation and order retries do not recalculate or repeat deductions. Missing mappings warn and remain orderable during rollout; unknown ingredient use is not guessed. Kitchen-only projections still omit stock and financial details.
+
+**Warn, not block:** ordinary shortages succeed without manager approval, record full consumption and expose negative balances. Shortages do not bypass menu availability, permissions or persistence/numeric validation. A failed transaction rolls back order/KOT/stock together. Customer bill printing excludes internal stock warnings.
 
 ## History, kitchen and reports
 

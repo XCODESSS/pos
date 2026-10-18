@@ -10,12 +10,13 @@ Full delivery contract: `PRODUCT.md`. Current evidence: `docs/roadmap/STATE.md`.
 - Menu/category administration, absolute-price variants and per-serving add-ons with availability/version guards.
 - Server-priced immutable demo bills, takeaway checkout, open/paid history, bill recovery, cash recording and IST gross paid sales.
 - Floor/table setup, occupancy, running checks, multiple immutable kitchen batches, transfers and exact amount-based split cash payments. First payment locks dish additions; full settlement releases the table independently of kitchen progress. Guest/item splits, refunds and voids are not implemented.
+- Ingredient stock/low-stock setup, receiving/waste/explained adjustments, immutable movement history and versioned base/variant/add-on recipes. Accepted food submissions consume stock once; previews and persisted shortage/coverage warnings allow ordering and expose negative balances. Owner/manager administration is connected to cashier ordering.
 - Price-free KDS with queued → preparing → ready → served and guarded retries.
 - Explicit `/t/{business-code}/api` routing to separately configured tenant databases. Staff sessions and browser recovery journals are tenant-scoped; no global `/api` fallback. Two-business isolation and tenant/environment database-binding checks run in the acceptance suite.
 - Disposable real PostgreSQL HTTP verification plus a backup-to-fresh-database restore drill. REA observes desktop, 390px receipt recovery and tenant-switch workflows.
 - Separate loopback-only staging configuration and local promotion of the exact verified images. CI configuration exists; it has not run remotely and does not deploy.
 
-This is not the completed product. Inventory, business control, loyalty, offline operation, SaaS lifecycle administration, multiple outlets per business and full native parity remain required. Operational/security/tax/hardware release gates are explicit in `docs/OPERATIONS.md`.
+This is not the completed product. Supplier/purchase-order/payable workflows, stock valuation/expiry/reversals, business control, loyalty, offline operation, SaaS lifecycle administration, multiple outlets per business and full native parity remain required. Manual stock receiving is not the whole purchasing module. Operational/security/tax/hardware release gates are explicit in `docs/OPERATIONS.md`.
 
 ## Local development with Docker
 
@@ -89,11 +90,11 @@ Android source: open `android/` with Android SDK 35 and JDK 21; run `./gradlew a
 
 SwiftUI source: requires Mac/Xcode, iOS 17+ SDK, XcodeGen and signing for physical installation. From `ios/`, run `xcodegen generate`, then build the Counterline scheme in Xcode. Simulator backend URL is **http://localhost:8080/t/demo** on the backend's Mac; physical devices require an approved reachable HTTPS endpoint.
 
-Both native clients retain their complete server base URL with checkout IDs and reject recovery against a different base. Old unscoped prototype journals are not silently assigned to a business; recover known IDs through the authorized demo web workspace. Sources currently expose basic takeaway checkout, not variants/check/admin/KDS parity. Android SDK location and Mac/Xcode/signing remain blockers: **neither native client is claimed compiled/device-verified**. Device instructions: `docs/DEVICES.md`.
+Both native clients retain their complete server base URL with checkout IDs and reject recovery against a different base. Old unscoped prototype journals are not silently assigned to a business; recover known IDs through the authorized demo web workspace. Sources currently expose basic takeaway checkout, not variants/check/admin/KDS/inventory-management parity. They now decode/display submission stock warnings, but this native source change remains uncompiled/device-unverified. Android SDK location and Mac/Xcode/signing remain blockers: **neither native client is claimed compiled/device-verified**. Device instructions: `docs/DEVICES.md`.
 
 ## Git workflow
 
-The application has its own local Git repository. `main` retains the honest initial source snapshot; ongoing groundwork is on `feat/prototype-foundation`. Make small feature-scoped commits after relevant verification, not fabricated retrospective commits or one final giant commit. No remote or push is configured/authorized. Merge only after the branch's release gates pass and the intended release scope is reviewed.
+The application has its own local Git repository. `main` retains the honest initial source snapshot; the verified foundation was fast-forwarded to `main`; current inventory work is on `feat/inventory-recipes`. Make small feature-scoped commits after relevant verification, not fabricated retrospective commits or one final giant commit. No remote or push is configured/authorized. Merge only after the branch's release gates pass and the intended release scope is reviewed.
 
 ## Important limits
 

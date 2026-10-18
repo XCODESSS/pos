@@ -6,7 +6,7 @@ One integrated staff-facing restaurant product for independent businesses in Ind
 
 Offline remains required after stable online workflows. All requested inventory, business-control and loyalty capabilities remain in scope; this foundation milestone postpones their implementation, not their delivery. REA is a separate authorized observation tool, not the application framework or evidence of private Petpooja parity.
 
-## NOW — verified evolutionary prototype foundation
+## Completed foundation — verified locally
 
 Outcome: version-controlled, reproducibly verifiable software with cross-business isolation and a separately configured local staging/recovery path. Spec: `FOUNDATION.md`; executable tasks: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
 
@@ -22,9 +22,15 @@ Exit evidence:
 
 Production is not the exit claim. Hosted TLS/monitoring, privileged-role separation, fiscal policy, tenancy lifecycle, native/toolchain and hardware gates remain open. Current evidence and any unfinished acceptance conditions: `STATE.md`.
 
+## NOW — connected inventory/recipes review
+
+Spec `INVENTORY.md` and plan `../superpowers/plans/2026-10-18-inventory-recipes.md` deliver fixed-unit ingredients, receiving/waste/adjustment history, versioned recipes, exactly-once stock consumption on accepted food submissions and warning-only shortages. The backend/web increment has18 passing public acceptance cases, stock/money restore, a retained V5→V7 preservation rehearsal and six complete REA scenarios. New inventory setup/workflow/narrow captures have30/39/8 completed steps. Current evidence and build/native limits: `STATE.md` / `FINDINGS.md`.
+
+This is on local `feat/inventory-recipes`, not automatically merged/promoted. User development/staging stay stopped. Full purchasing/supplier/payable, stock valuation/expiry and explicit reversal policies are still open; manual receiving does not erase those requirements.
+
 ## NEXT — integrated online product and SaaS operating model
 
-1. **Inventory and recipes:** ingredient units/versioned recipes, receiving/purchasing, wastage and low-stock views; consume stock exactly once on accepted kitchen submission. Record adjustments/reversals rather than silently changing stock.
+1. **Purchasing and stock reconciliation:** extend the verified ingredient/recipe/receiving/waste increment with supplier/purchase-order/payable workflows and reconciliation. Shape valuation/lot/expiry and cancellation/reversal policies explicitly; do not silently restore ingredients for a financial refund.
 2. **Business control:** expenses, cash shifts/closing, reconciliation and useful sales/item/stock reports. Separate cash receipts from sales recognition; define immutable refund/credit-note policies.
 3. **Customers and loyalty:** consent-aware records, benefits and points tied to real settlements with safe retries/reversal rules.
 4. **SaaS lifecycle and outlets:** approved tenant provisioning/offboarding, subscription/access policy, configuration/backup/migration fleet operations and multi-outlet memberships/permissions. Current database isolation is not onboarding automation. Decide pilot scale and capacity before increasing the bounded tenant registry.

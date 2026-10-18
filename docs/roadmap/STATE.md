@@ -2,16 +2,28 @@
 
 Updated: 2026-10-18
 Target: integrated staff-facing multi-tenant SaaS for India/INR, web + Kotlin Android + SwiftUI iOS/iPadOS
-Current milestone: evolutionary prototype foundation
-Status: local evolutionary-prototype foundation complete and verified; production/SaaS lifecycle gates remain open
+Current milestone: connected inventory/recipes with warning-only shortages
+Status: backend/web inventory, upgrade/restore and browser flows pass in disposable environments; native/toolchain and production/SaaS lifecycle gates remain open
 
 ## Scope and architecture
 
 Independent restaurant businesses are separate tenants. The current shared backend uses explicitly registered database-per-tenant runtimes; each tenant currently has one outlet. No public signup, subscription control plane or multi-outlet memberships exist. Architecture trade-off: D-008. Full contract: `../../PRODUCT.md`. Foundation spec: `FOUNDATION.md`; execution plan: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
 
-## Working / observed in this milestone
+## Inventory increment — 2026-10-18
 
-- Application Git repository initialized at `D:/pet-pooja/pos`. Baseline `35a8d71` is on `main`; ongoing commits are on `feat/prototype-foundation`. No remote/push. Credentials, signing material, generated outputs and evidence remain ignored.
+- Verified foundation was fast-forwarded to local `main`; current work is on `feat/inventory-recipes`. No remote/push. Spec: `INVENTORY.md`; executable plan: `../superpowers/plans/2026-10-18-inventory-recipes.md`.
+- Ingredients have fixed G/ML/EACH units, exact integer-thousandth quantities, low/negative stock visibility and immutable actor/reason-linked receiving, waste and adjustment movements. Opening balances are explicit adjustments. Concurrent/manual command replay is deduplicated and stale edits reject.
+- Append-only recipes cover base dishes, independent variants and additive extras. Preview does not reserve/deduct. Accepted takeaway orders and extra check batches atomically consume once with bill/KOT and persist recipe versions/requirements/shortages/coverage. Existing V1–V5 migrations are unchanged; V6/V7 add the ledger and recipes. Older orders stay `inventory:null`, not retro-deducted.
+- D-009 is implemented: ordinary shortages warn and allow cashier continuation without manager approval; negative balances remain visible. Unknown mappings warn without inventing ingredients. Permission, persistence and numeric failures still reject/roll back. Stock warnings are excluded from customer bill printing.
+- Eighteen public acceptance cases pass, including quantities, snapshots, concurrency, variant/add-on arithmetic, additional batches, roles, tenants and numeric-failure atomic rollback. Full restore preserves negative stock, movements, recipe revisions and stock snapshots as well as money/session facts. A retained V5-image rehearsal preserves a paid INR147 bill and proves no later recipe mapping creates historical consumption.
+- Six REA scenarios passed; the new inventory setup/workflow/narrow captures include 30/39/8 completed steps respectively. Real owner setup received100g, recorded5g waste and5g adjustment, saved70g then75g recipe revisions, and a cashier accepted two servings with a50g shortage. One150g consumption left−50g; receipt settlement did not consume again. Desktop/390px screenshots were reviewed. Exact evidence IDs and paths are in `FINDINGS.md`.
+- Container Gradle dependency downloads failed TLS handshakes. An explicit `--host-backend` runner option rebuilt the current JDK21 distribution with cached host Gradle offline, then packaged/tested it in the isolated stack. No TLS weakening or gate skipping; default container compilation and remote CI are not claimed verified for this increment.
+- Native sources now decode/display submission shortage/coverage warnings. Android assembleDebug was attempted and again stopped at missing SDK location before source compilation. SwiftUI requires unavailable Mac/Xcode. Native stock administration/preview parity and physical devices remain unverified.
+- User development/staging stayed stopped throughout; their volumes, credentials and V5 images were not migrated/promoted by this increment. New functionality is verified on the local feature branch, not yet deployed to those environments.
+
+## Foundation — previously verified
+
+- Application Git repository initialized at `D:/pet-pooja/pos`. Baseline `35a8d71` and the verified foundation through `35f87f0` are now on `main`; that foundation branch is retained. No remote/push. Credentials, signing material, generated outputs and evidence remain ignored.
 - Staff/catalog/order/KDS/cash core plus menu choices, tables/running checks, immutable kitchen rounds, transfer and amount-based splits build and run. First payment locks additions; complete settlement releases the table independently of kitchen state. Demo receipts are not fiscal invoices.
 - `/t/{business-code}/api` selects a registered tenant database before authentication. Staff sessions and browser pending/draft/recovery keys are scoped by business. Global `/api` is absent. Two test businesses can reuse usernames, dish IDs and order UUIDs without sharing data/tokens/reports.
 - V5 adds immutable tenant/environment database binding without editing V1–V4. Mismatched tenant/environment probes fail before listening. Fresh verification/staging catalogs exclude exact untouched V1 demo fixtures; populated unbound non-development databases are refused. Non-development roles are nonprivileged and distinct; a real role probe denies cross-database CONNECT.
@@ -26,15 +38,15 @@ Independent restaurant businesses are separate tenants. The current shared backe
 
 ## Current development runtime
 
-Both development and staging Compose stacks, including their databases, were stopped at the user's request after validation. Containers, volumes and credentials are preserved. Development resumes at `http://127.0.0.1:8088/t/demo/` with ignored `.env`; staging resumes at `http://127.0.0.1:18088/t/stage-demo/` with separate ignored `.env.staging`. Both retain the exact application image objects verified from commit `9cb1e27`; later changes are verification-tooling/documentation only.
+Both development and staging Compose stacks, including their databases, were stopped at the user's request after validation. Containers, volumes and credentials are preserved. Development resumes at `http://127.0.0.1:8088/t/demo/` with ignored `.env`; staging resumes at `http://127.0.0.1:18088/t/stage-demo/` with separate ignored `.env.staging`. Both retain the exact V5 application image objects verified from commit `9cb1e27`; newer inventory code is only on the feature branch/disposable verification stacks and has not been promoted.
 
 ## Remaining product / release gates
 
-- Inventory/recipes/receiving/purchasing/wastage; expenses/shifts/reconciliation; customer consent/loyalty; offline durable outbox, registered devices and synchronization.
+- Complete purchasing/supplier/payable and stock valuation/expiry/reversal policies; expenses/shifts/reconciliation; customer consent/loyalty; offline durable outbox, registered devices and synchronization. Existing recipes/manual receiving/waste are the current connected increment, not the complete purchasing product.
 - SaaS tenant lifecycle/subscriptions, large-fleet provisioning/migration/pooling, multi-outlet authorization and hosted deployment.
 - Separate runtime/migrator DB privileges, TLS/ingress/proxy trust, secret rotation, MFA/recovery/idle policy, production monitoring, encrypted/off-host retention and measured recovery objectives, accounting/fiscal rules, security/load/accessibility and hardware validation.
 - Complete native menu choices/check/admin/history/KDS workflows and real builds/devices. Android SDK and Mac/Xcode/signing remain unresolved. Native default tenant URL sources changed, but neither client is claimed built or device-tested.
 
 ## Next action
 
-Shape the inventory/recipe increment around exactly-once consumption on accepted kitchen submissions, retaining tenant isolation and immutable historical facts. The user chose warning-only shortages (D-009): allow authorized continuation without manager approval and retain visible negative stock rather than blocking or hiding deficits. This policy is recorded, not yet implemented. Continue the separate hosted SaaS lifecycle/security/multi-outlet release gates before a public pilot. Current foundation branch remains unmerged with a clean worktree and no remote/push; CI is configured but unexecuted remotely.
+Review the completed inventory branch and its API/business policies, then shape supplier/purchase ordering and receiving reconciliation before the expenses/shift-control increment. Keep explicit cancellation/reversal and multi-outlet policies rather than guessing physical stock returns. Resume/promote user environments only when requested. CI remains configured but unexecuted remotely; hosted SaaS/security/native gates remain required.

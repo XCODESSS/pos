@@ -77,3 +77,13 @@ Date: 2026-10-18. Status: accepted (explicit user choice); inventory implementat
 When a recipe-backed kitchen submission requires more stock than recorded, show an ingredient-specific shortage warning and allow otherwise authorized staff to continue without manager approval. Record the full consumption exactly once and expose any resulting negative balance; do not clamp balances to zero, invent stock receipts or silently skip deductions.
 
 Rationale: recorded quantities can lag physical stock; avoid interrupting service while inventory tracking is established. Trade-off: the system may record negative stock and requires visible reconciliation through receiving/adjustments. This policy applies only to modeled stock shortages: it does not bypass menu availability, permissions, input validation or transactional persistence failures. Strict stock blocking is not part of the initial inventory scope; revisit if the user changes the operating policy.
+
+## D-010 — Stock consumption belongs to accepted food submissions
+
+Date: 2026-10-18. Status: initial inventory implementation, with D-009's explicit user policy.
+
+Use integer thousandths of fixed G/ML/EACH base units. Every balance change has an attributable immutable movement; manual adjustments are deltas with reasons rather than direct balance replacement. Append recipe revisions: a selected variant uses its own recipe instead of BASE, while add-on recipes add per-serving quantities. Missing mappings warn during rollout rather than inventing ingredient usage or blocking the existing menu.
+
+Record requirements, used revisions, shortages and coverage when a new standalone order/check batch is accepted, atomically with its bill and KOT. Only a winning new order can consume; retry, payment, kitchen progression and transfer never consume again. Later recipe/receipt changes do not rewrite the saved evidence. Migrated orders remain unknown (`inventory:null`), not backfilled from today's recipes. An inventory transaction failure rejects the entire submission; this is distinct from an ordinary shortage that is allowed under D-009.
+
+Trade-off: this tracks accepted preparation requests, not precise physical usage by individual kitchen stage/station. Reservations, cancellations/refunds, automatic ingredient reversals, waste reclassification and ingredient substitution need explicit later policies. The first implementation supports manual receiving, not purchase-order/payable/valuation/lot workflows. Revisit when those capabilities are shaped; never silently restore food stock merely because money was refunded.

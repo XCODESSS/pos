@@ -35,7 +35,11 @@ export REA_CHROME=/absolute/path/to/chrome
 node verification/run.mjs --browser
 ```
 
-The runner also observes three REA scenarios: menu choices through two kitchen batches/transfer/split settlement, a 390px receipt recovery, and tenant switching with another business's recovery key present. Passwords are environment-backed declared secrets; tokens stay in memory. Ignored evidence/screenshots are under `verification/.artifacts/<run-project>/`. This is desktop Chrome, not physical Android/iPhone verification. Without `--browser`, the HTTP/recovery gates still run but UI evidence is not produced.
+The runner also observes the foundation REA scenarios: menu choices through two kitchen batches/transfer/split settlement, a 390px receipt recovery, and tenant switching with another business's recovery key present. Passwords are environment-backed declared secrets; tokens stay in memory. Ignored evidence/screenshots are under `verification/.artifacts/<run-project>/`. This is desktop Chrome, not physical Android/iPhone verification. Inventory scenarios additionally exercise ingredient creation, receiving/waste/adjustments, recipe revisions, cashier shortage continuation and a negative-stock dashboard at desktop/390px widths. Without `--browser`, the HTTP/recovery gates still run but UI evidence is not produced.
+
+For a local V5→V7 rehearsal, add `--upgrade-from=counterline-backend:9cb1e27` only when that retained verified image exists locally. The runner starts it in the **disposable** project, creates a paid legacy bill, upgrades to the new image and proves receipt preservation, `inventory:null` and no retroactive deduction after recipe mapping. It never starts/migrates the stopped development or staging stacks. CI without that retained image does not claim this upgrade rehearsal.
+
+The restore drill now also verifies negative stock, immutable movement history, recipe revisions and order-stock snapshots. Verification backend build mode and optional upgrade coverage must be reported separately from default container compilation and native builds.
 
 ## Promote the actual verified images
 
@@ -71,7 +75,7 @@ Do not use `down -v` on development/staging. The verification runner's scoped vo
 ## Migration and rollback procedure
 
 1. Keep the current release image IDs, source commit, environment/tenant registry and a verified backup for **each** tenant. Know the last successful restore time.
-2. Verify the proposed release in an isolated stack, including an upgrade rehearsal on a sanitized copy at the deployed schema version. The current suite covers fresh V1→V5 and restore-to-V5, not every future upgrade.
+2. Verify the proposed release in an isolated stack, including an upgrade rehearsal on a sanitized copy at the deployed schema version. The current suite covers fresh V1→V7 and restore-to-V7; an optional retained-image rehearsal covers V5→V7, not every future upgrade.
 3. In a maintenance window, stop mutations before backing up/migrating; verify database/tenant identity and backup integrity. Do not expose startup migration errors publicly.
 4. Start the selected backend image. Current startup migrates registered tenant databases sequentially and fails the application if any tenant fails; it is not zero-downtime fleet migration. Expand/contract migrations and an independent migrator remain production requirements.
 5. Check `/health`, `/ready`, tenant login, a nonfinancial read and reconciliation. Reload Nginx's upstream resolution after recreating the backend: `docker compose --env-file .env.staging -f compose.staging.yaml exec -T web nginx -s reload`.
@@ -100,7 +104,7 @@ A disaster restore can revive sessions/revocations as of the backup. The automat
 - Separate migration/runtime privileges; trusted HTTPS/ingress/proxy configuration; production secret rotation, account recovery/MFA/idle policy; XSS/CSP/security review, isolation-abuse and load testing.
 - Real monitoring/alerts/error correlation, audit access/tamper-resistance policy, restore objectives and an operator incident/support process. Existing readiness/logs are groundwork, not a hosted monitoring implementation.
 - Validated India GST/fiscal numbering/credit-note/refund policy; current receipts remain demo bills and cash recording is not digital payment processing.
-- Inventory/recipes/purchases/wastage, shifts/expenses/reconciliation, loyalty and offline continuity from the full product contract.
+- Complete purchasing/supplier/payable and stock valuation/expiry/reversal workflows, shifts/expenses/reconciliation, loyalty and offline continuity from the full product contract. Existing manual receiving/recipes/waste tracking are only the current inventory increment.
 - Successful native builds, complete native workflows, physical phones, printers/drawers, accessibility and failure-recovery checks.
 
 No hosting, public TLS, external payment provider, app signing, live restaurant use or cloud account provisioning is authorized by this runbook.

@@ -134,3 +134,27 @@ The runner tagged the same tested application image objects without rebuilding/p
 Public development facts captured before the upgrade were identical after migration into the stable demo tenant context: 14 orders, 11 menu records, two tables, 42,000 paise current-day sales, including complete bill/payment/kitchen payloads. The original owner credentials still worked. No development volume was deleted and no live payment/provider was touched. Local bounded records: `.local/staging-smoke.json`, `.local/pre-foundation-promotion.json`, `.local/development-preservation.json`.
 
 A final verification-tooling fix explicitly passes an empty Compose env file so development `.env` cannot be auto-loaded. The complete non-browser acceptance/restore/misconfiguration suite passed again afterward. This is verified local pre-production groundwork, not hosted production readiness, automated fleet onboarding, native compilation or a remote CI run.
+
+## 2026-10-18 — Connected inventory/recipes, warnings and preserved history
+
+User confirmed warning-only shortages (D-009), then requested continuation. The verified foundation was rechecked and fast-forwarded into local main; work proceeded on `feat/inventory-recipes` with a saved spec/plan and small commits. V6/V7 add ingredients, immutable movement/recipe history and saved submission evidence without rewriting V1–V5 or altering user environments.
+
+Critical red/green observations: the ingredient/receiving case first returned404 before routes existed; recipe preview first returned404; accepted-order stock evidence was absent before integration. Those cases passed after implementation. The final gate passes18 public acceptance cases (16 core, one fresh-environment, one restoration), plus wrong-tenant/environment startup, cross-DB role denial and retained-image upgrade probes. Assertions use public responses, not private stock tables.
+
+Known-correct observations: receiving500g then submitting four150g servings succeeds, records a100g shortage and leaves−100g. Concurrent duplicate commands/submissions produce one movement/deduction. Variants replace base recipes and selected extras add per serving; check rounds consume independently, while payment/preparation/replay do not. Negative stock is retained, unknown coverage warns, stale/invalid writes reject, and numeric-range failure leaves no partial order/KOT/stock event.
+
+The actual V5 release image `counterline-backend:9cb1e27` created a paid INR147 legacy bill inside a disposable project. Upgrade to V7 preserved its complete bill/payment; `inventory` remained null and replay after mapping a new recipe did not retro-deduct. The restore drill also preserved negative ingredient balance−50g, two consumption movements, old recipe revision75g, submitted stock snapshot, money totals and sessions.
+
+Docker Gradle downloads failed TLS handshakes on Kotlin dependencies; local JDK21 offline builds succeeded. Explicit `--host-backend` mode rebuilt the current distribution, then packaged/tested it in Docker. No TLS settings were weakened and no test/restore/browser gate was skipped. Default container compilation and remote CI are not claimed passing for this increment.
+
+Final command: `node verification/run.mjs --host-backend --upgrade-from=counterline-backend:9cb1e27 --browser` with installed REA/Chrome paths. Full ignored evidence: `verification/.artifacts/counterline-verify-1025724e578f/`; log `.local/inventory-delivery-gate.log`.
+- Foundation desktop46 steps: `ev_7506fb64d66b412cff32f33af1a29ba60c57b359422e5fca8cf0444d92f57d09`.
+- Foundation narrow9 steps: `ev_2870daf1d19a0c8c9b4668bb086abb8e539401ee920a9c8ba0c4d2272e3f729b`.
+- Tenant switch6 steps: `ev_b258583b6ed8bd44649289397ef1cc0c798fdcdfc18967cfb7e0075f97884edb`.
+- Inventory setup30 steps: `ev_23b6fedce6b0d17af88a97fb49f3fc3add676d0111c93370ce7683ded8b63f3f`.
+- Inventory workflow39 steps: `ev_b2c95cd43c302998a52b1c9d69dc4bf9736399d72e56261421c431598d6f5146`.
+- Inventory narrow8 steps: `ev_a9ca7df78acb45813514a6fc587b1756b62b39bf0d47c3885c8e336d4fee80d9`.
+
+Counts include each scenario's initial state; every declared action completed. Through the actual UI an owner created an ingredient, received100g, recorded5g waste and a5g correction, saved70g then75g recipe revisions and read the historical version. A cashier saw a50g shortage, ordered two servings anyway, and settled INR252. One150g deduction left−50g. Public postconditions verified cashier attribution on order, payment and consumption and no cashier stock-administration navigation. Desktop/390px screenshots were reviewed; this is not Safari/physical-phone verification.
+
+Host web build succeeded and npm audit reported zero known vulnerabilities. Android warning-display sources were changed, but assembleDebug failed before compilation at missing SDK location (`.local/inventory-android-build.log`); Mac/Xcode remains unavailable. No native success is claimed. Both user development/staging stacks remained stopped with their original volumes/credentials/V5 images; inventory was not promoted to them. Manual receiving does not complete purchasing/supplier/payable/valuation/expiry/reversal capabilities.
