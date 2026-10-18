@@ -118,4 +118,19 @@ Complete local evidence under ignored `verification/.artifacts/counterline-verif
 - 390px recovery: 9 completed steps, `ev_81b2f977a2d3ea2d0c3b942e2df510b8968a96113fc563047ef199c28dfe8a59`.
 - Tenant-switch: 6 completed steps, `ev_dcbc6c9a01d6efc55b859b5945782baec27a4bc50970af58465f54695ea7d8e1`.
 
-Counts include REA's initial scenario state; all declared actions completed. Declared owner secrets were environment-backed; no request/response body capture or bearer-token storage was selected. This is desktop Chrome, not Safari/physical phones or printer testing. Host builds succeeded; npm audit reported zero known vulnerabilities at validation time. CI configuration is not a remote CI execution; staging promotion/startup is recorded separately when observed.
+Counts include REA's initial scenario state; all declared actions completed. Declared owner secrets were environment-backed; no request/response body capture or bearer-token storage was selected. This is desktop Chrome, not Safari/physical phones or printer testing. Host builds succeeded; npm audit reported zero known vulnerabilities at validation time. CI configuration is not a remote CI execution.
+
+## 2026-10-18 — Exact-image staging promotion and preserved development upgrade
+
+Clean commit `9cb1e27` passed all nine HTTP/recovery acceptance cases, two database-identity mismatch probes, the cross-database role denial and the complete REA gate. Complete release-run evidence is under ignored `verification/.artifacts/counterline-verify-5a4845fbdf0f/`:
+- Desktop: `ev_899325e1989a6e86af66d1e1d1d5c113a2ba77dd15e5ae74896f8cebd19f7bf1`.
+- Narrow recovery: `ev_fc96181d64cca4e42fc2431a248702fb3721aa87a3fb2d193b00b16de56cda5b`.
+- Tenant-switch: `ev_b847125b37c6b1b71e59a5dea4195b3e6d04ad7aedc0c1d4b2e5afe231f5fe05`.
+
+The runner tagged the same tested application image objects without rebuilding/pushing. Separate local staging then started with those tags and new generated credentials/tenant identity/volume, empty catalog and zero sales. Owner/session persisted after backend restart; comparison against `release.json` confirmed identical running image IDs:
+- Backend: `sha256:104a846545607a5bb0d529c1669d5c60e6b2b6b70c59aa8dcc6dd71373a69d28`.
+- Web: `sha256:a933939fbc5e15744d007c83d3c031d5c98ba461d6d64b3fbe1efa6aa69d9e08`.
+
+Public development facts captured before the upgrade were identical after migration into the stable demo tenant context: 14 orders, 11 menu records, two tables, 42,000 paise current-day sales, including complete bill/payment/kitchen payloads. The original owner credentials still worked. No development volume was deleted and no live payment/provider was touched. Local bounded records: `.local/staging-smoke.json`, `.local/pre-foundation-promotion.json`, `.local/development-preservation.json`.
+
+A final verification-tooling fix explicitly passes an empty Compose env file so development `.env` cannot be auto-loaded. The complete non-browser acceptance/restore/misconfiguration suite passed again afterward. This is verified local pre-production groundwork, not hosted production readiness, automated fleet onboarding, native compilation or a remote CI run.

@@ -32,7 +32,7 @@ Native source compilation and physical-device/hardware validation remain separat
 | `.gitignore`, `.gitattributes` | Protect local secrets/artifacts; normalize source line endings |
 | `README.md`, `docs/roadmap/STATE.md` | Honest current state and developer commands |
 | `verification/compose.yaml` | Disposable real DB/backend/web topology, unique project isolation |
-| `verification/run.mjs` | Own stack creation, random credentials/ports, test process, cleanup |
+| `verification/run.mjs`, `verification/compose.env`, `verification/health.mjs` | Own stack creation, explicit isolated environment, readiness, test/release process and cleanup |
 | `verification/http.mjs` | Small public HTTP client shared by acceptance cases |
 | `verification/checkout.test.mjs` | Server pricing, receipt preservation, retry/concurrency and reporting behavior |
 | `verification/identity.test.mjs` | Role access and session revocation behavior |
@@ -49,7 +49,7 @@ Native source compilation and physical-device/hardware validation remain separat
 | `backend/src/main/kotlin/in/counterline/Environment.kt` | Parse supported environments and bind new/existing databases safely |
 | `backend/src/main/resources/db/migration/V5__environment_identity.sql` | Durable environment marker, additive migration only |
 | `backend/src/main/kotlin/in/counterline/Main.kt` | Enforce environment policy before accepting traffic |
-| `compose.staging.yaml`, `.env.staging.example` | Separate loopback staging deployment using tested images |
+| `compose.staging.yaml`, `.env.staging.example`, `ops/configure-staging.mjs`, `ops/init-staging.sh` | Separate loopback staging, generated non-overwriting secrets and a restricted tenant DB role |
 | `.github/workflows/verify.yml` | Build and run the isolated verification command on CI |
 | `docs/OPERATIONS.md` | Release, migration, restore, rollback and outstanding production gates |
 | `docs/API.md`, `PRODUCT.md`, `docs/roadmap/*` | Reconcile documented interfaces and actual validation evidence |
@@ -139,7 +139,7 @@ assert.equal(order.bill.totalPaise, 29400);
 - [x] Pass `APP_ENV=verification` in the isolated Compose file. Rerun `node verification/run.mjs`, with the environment case first.
 - [x] Add runner lifecycle probes: restarting backend with the same environment succeeds and persisted sessions work; starting it with `APP_ENV=staging` on its verification volume exits nonzero and does not expose a ready listener; restore the expected environment and verify unchanged public order data.
 - [x] Add standalone staging Compose requiring explicit `BACKEND_IMAGE`, `WEB_IMAGE` and credentials from `.env.staging.example`; use a separate named volume, no DB/backend host ports, and loopback web port 18088. Do not start a public service.
-- [ ] Commit `feat: isolate staging and verification environments`.
+- [x] Commit staging/verification infrastructure in verified checkpoints (`de8ae41` tenant/environment binding and `9cb1e27` staging/recovery/release tooling).
 
 ## Task 5: Repeatable release and recovery gates
 
@@ -152,15 +152,16 @@ assert.equal(order.bill.totalPaise, 29400);
 - [x] Run the full suite and restore drill with `node verification/run.mjs`. Confirm the development Compose services/volume remain healthy and present afterward.
 - [x] Add CI on push/pull request: checkout, Node 22.19.0, `npm ci` and web build, JDK 21 and backend distribution build, `node verification/run.mjs`. No deployment or external secrets; generated credentials exist only for the job.
 - [x] Document exact local release image tagging, separate staging env/volume, readiness checks, migration backup, app rollback limitations after schema changes, restore validation and manual production gates. Note CI has only been configured until an actual remote CI run exists.
-- [ ] Update evidence-backed state and mark only executed plan checkboxes complete. Preserve remaining inventory/offline/native work and open tenancy/tax/security decisions.
-- [ ] Commit `ci: gate releases on verification and recovery checks`; inspect `git status`, `git log --oneline --decorate`, `git remote -v` and secret exclusions. Do not push or merge a failing branch.
+- [x] Update evidence-backed state and mark only executed plan checkboxes complete. Preserve remaining inventory/offline/native work and open tenancy/tax/security decisions.
+- [x] Commit the CI/recovery gate (`9cb1e27`) and final verified tooling/documentation checkpoints; inspect `git status`, `git log --oneline --decorate`, `git remote -v` and secret exclusions. Do not push or merge a failing branch.
 
 ## Execution notes
 
 - Existing checkout/identity/front-desk behavior was characterized through the public interface; those cases were already green. New tenant routing and fresh non-demo environment cases were observed failing before implementation, then passing. The restore gate failed before the drill existed, and the first actual drill exposed a restart/readiness issue before the corrected reload path passed. Do not misreport all characterization cases as red-first feature work.
 - Task 3A and the binding portion of Task 4 were committed together because routing alone would not prevent a misconfigured second tenant from reusing a database. UI/REA checks followed that isolation change so all browser mutations ran in disposable tenant databases.
 - The restore script is an isolated child process rather than a general production restore command. Production backup retention, privilege separation and incident recovery remain gates.
-- Pending final acceptance: clean-commit verified image promotion, separate local staging smoke, development upgrade/data-preservation comparison and final evidence/commit.
+- Final acceptance completed: clean commit `9cb1e27` passed the HTTP/restore/REA gates; the same tested images were promoted locally and started in separate staging with zero catalog/sales, matching image IDs and credentials/session preservation on restart. Development upgrade preserved all 14 orders, 11 catalog records, two tables and current-day gross sales. Evidence: `docs/roadmap/FINDINGS.md` and `STATE.md`.
+- A final harness check explicitly excluded automatic `.env` loading via `verification/compose.env`; nine acceptance cases plus identity/role probes and the restore drill passed afterward. CI remains configuration only because no remote or push exists. Production gates are deliberately not checked off by these local results.
 
 ## Exit review
 
