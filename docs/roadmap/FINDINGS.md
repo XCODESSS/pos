@@ -101,4 +101,21 @@ Generated QA accounts were disabled after checks; test dishes were marked unavai
 
 Host Kotlin and TypeScript/Vite builds succeeded; web npm audit reported zero known vulnerabilities at that time. Android assembleDebug was retried after source authentication changes and again stopped at missing SDK location, before native compilation. SwiftUI/Xcode remains unavailable on this Windows host. Native sign-in source changes are not native build/device verification.
 
-Implication: there is now a runnable connected identity/catalog/checkout/kitchen/cash core, including packaged deployment proof. Catalog choices, tables/running checks/splits, stock/recipes, closing/reconciliation, loyalty, offline, tenant/outlet isolation, native UI parity and release-quality tests/security/accounting/hardware gates remain required—not silently completed by this evidence.
+Implication at that date: there was a runnable connected identity/catalog/checkout/kitchen/cash core, including packaged deployment proof. Later entries supersede parts of that day's remaining-work list; none imply production readiness.
+
+## 2026-10-18 — Evolutionary SaaS foundation verification
+
+The user confirmed multi-tenant SaaS and authorized a durable plan, execution, local Git and incremental commits. The application now has a baseline on main and a foundation branch; no remote or push. Spec: `FOUNDATION.md`; plan: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
+
+A shared backend explicitly routes business paths to independent PostgreSQL databases/roles. Disposable acceptance stacks verify identical business usernames/menu IDs/order UUIDs remain independent, cross-business sessions fail (401), foreign order/check IDs fail (404), wrong tenant/environment markers reject startup, and a tenant's DB role cannot CONNECT to another tenant database. Fresh non-development catalogs start without demo fixtures. This proves the selected local isolation paths, not a penetration test or hosted SaaS control plane.
+
+`node verification/run.mjs` passes nine acceptance cases, two startup-misconfiguration probes, a DB-role denial and a real restore roundtrip. Dumping and restoring into a fresh scratch DB preserves a paid 15,698-paise bill, a check with 7,000 + 8,698-paise payments, session facts and gross sales. The first restore attempt exposed a web-container restart/ephemeral-port readiness issue; the drill now reloads Nginx and waits for readiness without reallocating its host port. Only generated verification projects/volumes are removed.
+
+REA 6.5.0 observed the real configured-menu → two kitchen batches → kitchen ready → transfer → cancelled confirmation → 20,000 + 22,000-paise cash → closed 42,000-paise check workflow. Narrow-screen recovery and a second business with an alpha recovery key seeded also completed. Reviewed screenshots show total/cash INR 420 and zero balance, two immutable batches and separate preparation states.
+
+Complete local evidence under ignored `verification/.artifacts/counterline-verify-831c6cc63293/`:
+- Desktop: 46 completed steps, `ev_15bf5c2c50e081ad7d0106a9d09638aa66b6f951e972dfa128f5ca95be965988`.
+- 390px recovery: 9 completed steps, `ev_81b2f977a2d3ea2d0c3b942e2df510b8968a96113fc563047ef199c28dfe8a59`.
+- Tenant-switch: 6 completed steps, `ev_dcbc6c9a01d6efc55b859b5945782baec27a4bc50970af58465f54695ea7d8e1`.
+
+Counts include REA's initial scenario state; all declared actions completed. Declared owner secrets were environment-backed; no request/response body capture or bearer-token storage was selected. This is desktop Chrome, not Safari/physical phones or printer testing. Host builds succeeded; npm audit reported zero known vulnerabilities at validation time. CI configuration is not a remote CI execution; staging promotion/startup is recorded separately when observed.

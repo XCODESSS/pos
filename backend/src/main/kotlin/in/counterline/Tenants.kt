@@ -48,6 +48,7 @@ class TenantRegistry private constructor(private val entries: Map<String, Tenant
             require(configs.size in 1..32) { "Configure between 1 and 32 tenant databases per application instance." }
             require(configs.map { it.id }.distinct().size == configs.size && configs.map { it.slug }.distinct().size == configs.size) { "Tenant identities and slugs must be unique." }
             require(configs.map { it.jdbcUrl }.distinct().size == configs.size) { "Tenants must not share a database URL." }
+            require(configs.map { it.username }.distinct().size == configs.size) { "Configure a distinct database role for each tenant." }
             configs.forEach {
                 val canonical = try { UUID.fromString(it.id).toString() } catch (_: IllegalArgumentException) { null }
                 require(canonical == it.id && Regex("[a-z][a-z0-9-]{2,62}").matches(it.slug)) { "Use canonical tenant UUIDs and 3–63 character lowercase business slugs." }

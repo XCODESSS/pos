@@ -24,17 +24,18 @@ Offline operation remains required, after the online workflows are stable. Inter
 
 These are connected increments of one product, not permission to declare a scaffold complete. The initial immutable-order demo needs a proper running-check model before supporting table additions/splits; do not bolt those onto paid bill snapshots or rewrite historical receipts.
 
-## Current delivery state — 2026-10-17
+## Current delivery state — 2026-10-18
 
 - Verified connected web core: individual staff/permissions → base menu administration → ordering → price-free role-limited KDS → cash settlement → gross daily sales. A real browser completed owner staff/dish creation, cashier ordering, kitchen preparation, cashier resumption and settlement. The packaged Compose application is built and running with DB readiness, not just isolated development endpoints.
-- This is **not the completed product**. Catalog variants/add-ons, venue/table/running-check operations and splits, inventory/recipes/purchases/wastage, expenses/shift reconciliation/richer reports, customer loyalty, offline synchronization, multi-outlet isolation and native UI parity are still required work.
+- Catalog choices and floor/table/running-check operations, additional batches, transfers and amount-based cash splits are implemented and have real HTTP + REA browser evidence. Multi-tenant SaaS is confirmed; explicit tenant routes, separate business databases, tenant-scoped sessions/journals and environment identity binding are verified against two isolated businesses. This does not implement multiple outlets per business or a hosted SaaS control plane.
+- This is **not the completed product**. Inventory/recipes/purchases/wastage, expenses/shift reconciliation/richer reports, customer loyalty, offline synchronization, multi-outlet authorization, native UI parity, tenant lifecycle/subscriptions and production security/tax/operations gates remain required.
 - Native Kotlin/SwiftUI authentication sources follow the new contract, but both builds/device verification remain blocked by toolchains. Phones alone do not satisfy those release gates.
-- Next connected model: catalog choices and a mutable running check containing immutable kitchen submission batches. Existing paid receipts must never be rewritten to simulate additions/splits. Follow it through stock and financial/loyalty ledgers rather than building unrelated CRUD demos.
+- Current foundation milestone adds isolated regression verification, a real restore drill and a separate local staging/release path before extending stock and financial/loyalty ledgers. Existing receipts remain immutable. The first check payment locks additions; splits are amounts rather than guest/item allocation. Restaurant pilot policies need explicit validation.
 
 ## Release meaning
 
 “Implemented” requires backend rules, migrations, usable screens, persistence, permission enforcement and error/recovery behavior. “Verified” requires observed evidence on the actual relevant client/platform. Missing native toolchains, provider contracts, credentials and accounting decisions remain explicit blockers, not fake integrations or success states.
 
-The present application remains single-outlet and development-only until pilot gates are met. Multi-tenant SaaS onboarding, app-store distribution, live digital payments and delivery-provider access must not be implied by local demos. No public deployment, credentials provisioning, purchase, issue publishing, commit or push is authorized merely by this document.
+The present application supports one outlet per explicitly registered business and remains a local development/staging preview until pilot gates are met. Multi-tenant onboarding/control-plane automation, app-store distribution, live digital payments and delivery-provider access must not be implied by local demos. The user separately authorized a local application Git repository and incremental commits; no remote/push, public deployment, external credentials provisioning, purchase or issue publishing is authorized merely by this document.
 
 Current evidence and next work: `docs/roadmap/STATE.md`. Offline, India/INR and staff-only scope are confirmed user requirements.

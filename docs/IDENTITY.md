@@ -1,10 +1,10 @@
 # Staff identity — current development policy
 
-This is an integrated single-outlet identity module, not a production identity provider or multi-tenant SaaS. The route permission matrix is in `API.md`.
+Identity is isolated per SaaS business database, with one outlet per business currently supported. Tenant routes select the database before authentication; another business's token cannot authenticate here. This is not a production identity provider or completed SaaS lifecycle. The route permission matrix is in `API.md`.
 
 ## Bootstrap and staff lifecycle
 
-- The first owner is created only when the staff table is empty, using `OWNER_USERNAME` and `OWNER_PASSWORD`. There are no built-in default credentials, public signup or shared-token bypass.
+- The first owner is created only when the staff table is empty, using that business's operator-supplied owner credentials (`TENANTS_JSON`, or development-only `OWNER_USERNAME` / `OWNER_PASSWORD`). There are no built-in default credentials, public signup or shared-token bypass.
 - Subsequent startups do not change existing account passwords. If staff exist but no active owner remains, startup fails closed rather than manufacturing a new owner. Do not use environment editing as a password-recovery mechanism.
 - Owners create named staff accounts, edit display names/roles/active state, and reset other staff passwords. The current development outlet is capped at 100 accounts, including disabled accounts.
 - An owner cannot disable or demote itself. Owner administration is serialized and rechecks the actor's active-owner status, so concurrent owner edits cannot remove the final acting owner through the supported interface.
@@ -34,9 +34,9 @@ New orders record the creating staff ID; cash settlements record the receiving s
 
 ## Recovery limits and release gates
 
-Web checkout IDs remain in session storage; the same authorized outlet staff can recover persisted bills after reauthentication. On expiry, same-user reauthentication preserves the mounted counter state; explicit sign-out warns before discarding an unsaved cart. Admin/kitchen unknown-command state is held while its workspace is open, not in a durable offline outbox. After navigation/reload, reconcile with server records before creating a new intent. Native journals retain IDs but not credentials; native UI parity and real-device behavior remain unverified.
+Web checkout/check IDs and front-desk pending intents use business-prefixed session-storage keys; old unscoped journals are not automatically migrated. Bearer tokens never enter those journals. Web checkout IDs remain in session storage; the same authorized outlet staff can recover persisted bills after reauthentication. On expiry, same-user reauthentication preserves the mounted counter state; explicit sign-out warns before discarding an unsaved cart. Admin/kitchen unknown-command state is held while its workspace is open, not in a durable offline outbox. After navigation/reload, reconcile with server records before creating a new intent. Native journals retain IDs but not credentials; native UI parity and real-device behavior remain unverified.
 
-Before a pilot: review the password-provider choice (OWASP prefers Argon2id for new systems), introduce outlet/tenant isolation, decide first-password rotation and sole-owner recovery, configure trusted TLS and proxy rules, add agreed regression checks, security review, backups/restores, operational monitoring and mobile verification. PBKDF2 selection here is a portable JDK trade-off, **not** a FIPS/compliance certification.
+Before a pilot: review the password-provider choice (OWASP prefers Argon2id for new systems), extend the verified database-per-tenant isolation to multi-outlet authorization and hosted onboarding, decide first-password rotation and sole-owner recovery, configure trusted TLS and proxy rules, add agreed regression checks, security review, backups/restores, operational monitoring and mobile verification. PBKDF2 selection here is a portable JDK trade-off, **not** a FIPS/compliance certification.
 
 ## Sources checked 2026-10-17
 

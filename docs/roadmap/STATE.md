@@ -3,33 +3,35 @@
 Updated: 2026-10-18
 Target: integrated staff-facing multi-tenant SaaS for India/INR, web + Kotlin Android + SwiftUI iOS/iPadOS
 Current milestone: evolutionary prototype foundation
-Status: existing web core and front-desk sources build; foundation execution in progress; not production-ready
+Status: tenant/environment isolation, automated HTTP and recovery gates, and REA browser flows pass locally; staging image-promotion smoke is next; not production-ready
 
-## Confirmed direction
+## Scope and architecture
 
-The user confirmed multiple independent restaurant businesses (multi-tenant SaaS), not just outlets of one business. Keep the full scope in `../../PRODUCT.md`. Establish version control, regression verification, tenant/environment isolation and a staging/release path before expanding inventory, business control, loyalty and offline functionality. Current spec: `FOUNDATION.md`; executable plan: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
+Independent restaurant businesses are separate tenants. The current shared backend uses explicitly registered database-per-tenant runtimes; each tenant currently has one outlet. No public signup, subscription control plane or multi-outlet memberships exist. Architecture trade-off: D-008. Full contract: `../../PRODUCT.md`. Foundation spec: `FOUNDATION.md`; execution plan: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
 
-## Current evidence
+## Working / observed in this milestone
 
-- Individual staff/roles, menu administration, immutable server-priced bills, KDS, cash recording and IST sales were browser-observed in the prior increment. Historical evidence is in `FINDINGS.md` and ignored `.local/` files.
-- Catalog variants/add-ons and tables/running checks/additional kitchen batches/transfers/amount-based cash splits now have backend + web source and additive V4 migration. Host backend/web builds and packaged Compose builds succeed.
-- Real HTTP observations on 2026-10-18: two configured servings produce INR 357; a second coffee batch brings the check to INR 420; split cash INR 200 + INR 220 closes it and increases paid checks by one. Four concurrent batch/final-payment retries produce one batch/payment mutation. Stale versions, occupied table edits, separate batch payment, post-split additions and overpayments are rejected. Snapshot prices remain unchanged after catalog edits. Evidence: `.local/frontdesk-http-observations.json`.
-- Current front-desk UI has not yet completed a browser-observed end-to-end journey. No durable automated regression suite exists at the start of this milestone.
-- Current runtime is still single-business. Multi-tenant isolation is planned, not claimed implemented: explicit tenant routes, one database per business, separate credentials/sessions/browser journals, and cross-tenant denial verification.
-- Existing local database and simulated transaction history are preserved. Development stack: web `http://127.0.0.1:8088`, backend `127.0.0.1:8080`, PostgreSQL `127.0.0.1:54329`. Credentials remain in ignored `.env`; bootstrap never resets an existing owner.
+- Application Git repository initialized at `D:/pet-pooja/pos`. Baseline `35a8d71` is on `main`; ongoing commits are on `feat/prototype-foundation`. No remote/push. Credentials, signing material, generated outputs and evidence remain ignored.
+- Staff/catalog/order/KDS/cash core plus menu choices, tables/running checks, immutable kitchen rounds, transfer and amount-based splits build and run. First payment locks additions; complete settlement releases the table independently of kitchen state. Demo receipts are not fiscal invoices.
+- `/t/{business-code}/api` selects a registered tenant database before authentication. Staff sessions and browser pending/draft/recovery keys are scoped by business. Global `/api` is absent. Two test businesses can reuse usernames, dish IDs and order UUIDs without sharing data/tokens/reports.
+- V5 adds immutable tenant/environment database binding without editing V1–V4. Mismatched tenant/environment probes fail before listening. Fresh verification/staging catalogs exclude exact untouched V1 demo fixtures; populated unbound non-development databases are refused. Non-development roles are nonprivileged and distinct; a real role probe denies cross-database CONNECT.
+- `node verification/run.mjs` passes nine public acceptance cases across fresh environment, pricing/snapshots/retries/concurrency, role denials/revocation, checks/transfers/splits, tenancy and restoration. Each run owns random credentials/ports and a separate Compose project/volume; development data is not mutated.
+- Real `pg_dump` / restore into a new scratch database preserves a paid INR 156.98 receipt, two check payments INR 70 + INR 86.98, sales and persisted session facts. Recovery uses a proxy reload/readiness gate instead of restarting the web container and potentially changing its ephemeral host port.
+- REA 6.5.0 observed 46 desktop steps, 9 narrow-screen receipt-recovery steps and 6 tenant-switch steps, including menu variants/add-ons, two KOT batches, preparation, transfer, cancel/confirm cash, final settlement and isolation of a seeded other-business journal. Screenshots were reviewed. Evidence: ignored `verification/.artifacts/counterline-verify-831c6cc63293/`; IDs in `FINDINGS.md`. Not physical phones/Safari/hardware.
+- Host JDK/backend and TypeScript/web production builds succeed; npm audit reported zero known vulnerabilities on this run. CI is configured for host builds plus HTTP/tenant/restore checks, but no remote CI execution has occurred.
+- Local staging config/secret generator and exact tested-image tagging are implemented. A clean-commit image promotion + separate staging startup/data-preservation smoke still needs to run before this milestone's final handoff.
 
-## Foundation work authorized
+## Current development runtime
 
-Initialize an application Git repository, honest current baseline and small feature-scoped commits on a branch. No remote/push or public deployment. Build isolated verification stacks with generated credentials; never run automated mutation checks on development data. Use REA for bounded browser evidence with explicit secret redaction.
+The pre-foundation Compose images remain running against the original database on ports web 8088/backend 8080/DB54329 until the planned verified upgrade. Credentials remain in ignored `.env`; startup never resets an existing owner. Preserve and compare public bill/menu/report facts before/after upgrading. The new development route will be `/t/demo/`, not the old unscoped API.
 
-## Required work / release gates
+## Remaining product / release gates
 
-- Multi-tenant isolation and separate environment binding; disposable public HTTP/UI regression suite; production-like local staging and recovery drill.
-- Tenant onboarding/lifecycle, multi-outlet authorization, public TLS/ingress, production identity/recovery/MFA decisions, monitoring, backup policy, tax/invoice compliance, hardware and accessibility verification.
-- Inventory/recipes/receiving/purchasing/wastage, expenses/shifts/reconciliation/reports, customer consent/loyalty, offline durable outbox/device identity/synchronization.
-- Native admin/history/KDS/check/choices parity and successful source/device builds. Android SDK is unconfigured; Mac/Xcode/signing access is not established. Phones alone do not satisfy these gates.
-- Current splits are exact cash amounts, not per-guest/item allocations. Additions stop at the first payment; full settlement releases the table independently of kitchen progress. Restaurant pilot policies still need validation.
+- Inventory/recipes/receiving/purchasing/wastage; expenses/shifts/reconciliation; customer consent/loyalty; offline durable outbox, registered devices and synchronization.
+- SaaS tenant lifecycle/subscriptions, large-fleet provisioning/migration/pooling, multi-outlet authorization and hosted deployment.
+- Separate runtime/migrator DB privileges, TLS/ingress/proxy trust, secret rotation, MFA/recovery/idle policy, production monitoring, encrypted/off-host retention and measured recovery objectives, accounting/fiscal rules, security/load/accessibility and hardware validation.
+- Complete native menu choices/check/admin/history/KDS workflows and real builds/devices. Android SDK and Mac/Xcode/signing remain unresolved. Native default tenant URL sources changed, but neither client is claimed built or device-tested.
 
 ## Next action
 
-Execute the saved foundation plan inline: baseline and branch → isolated public-interface verification → explicit tenant isolation → environment-bound staging and recovery gates. Update this file only with observed results; do not substitute scaffolds or configured CI for successful runtime evidence.
+Commit the operational foundation; run full HTTP/recovery/REA gates on that clean commit and tag the same tested images locally. Start independent synthetic staging, verify empty business state and preserved credentials on restart, then upgrade development with unchanged public records. Record final evidence and remaining gates; do not push or claim production readiness.

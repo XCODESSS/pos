@@ -20,6 +20,9 @@ services:
     restart: unless-stopped
     build: ./backend
     environment:
+      APP_ENV: development
+      TENANT_ID: 11111111-1111-4111-8111-111111111111
+      TENANT_SLUG: demo
       JDBC_URL: jdbc:postgresql://db:5432/counterline
       DB_USER: counterline
       DB_PASSWORD: ${DB_PASSWORD}

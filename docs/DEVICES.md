@@ -22,7 +22,7 @@ Prerequisites on this Windows computer: Android SDK Platform 35, compatible Buil
    adb reverse tcp:8080 tcp:8080
    ```
 
-5. In the native app, change **Server URL** to `http://127.0.0.1:8080`, sign in with your individual staff username/password. Initial owner credentials are in `.env` on first installation; changing an existing password must use the account workflow, not environment variables. `10.0.2.2` is for emulators, not physical phones. HTTP loopback is allowed only by the debug network configuration; do not weaken the release configuration.
+5. In the native app, change **Server URL** to `http://127.0.0.1:8080/t/demo`, sign in with your individual staff username/password. Initial owner credentials are in `.env` on first installation; changing an existing password must use the account workflow, not environment variables. `10.0.2.2` is for emulators, not physical phones. HTTP loopback is allowed only by the debug network configuration; do not weaken the release configuration.
 
 To exercise the new **web** Orders/Kitchen workspaces in Android Chrome, additionally run:
 
@@ -30,7 +30,7 @@ To exercise the new **web** Orders/Kitchen workspaces in Android Chrome, additio
 adb reverse tcp:5173 tcp:5173
 ```
 
-Open `http://127.0.0.1:5173` in Chrome on that phone. Vite proxies API calls on the computer. This USB route does not require exposing the dev server to Wi-Fi or the public internet.
+Open `http://127.0.0.1:5173/t/demo/` in Chrome on that phone. Vite proxies API calls on the computer. This USB route does not require exposing the dev server to Wi-Fi or the public internet.
 
 Remove these routes when finished:
 
@@ -63,5 +63,7 @@ A desktop Chrome viewport capture is useful for layout review but is not a real 
 - Two staff screens cannot accidentally skip a stage with stale controls.
 - Network interruption never appears as payment success; uncertain requests retain their IDs/transition intent for retry.
 - Touch targets, keyboard visibility, rotation, background/resume and receipt readability.
+
+Every native server base URL must include `/t/{business-code}`; the default development code is `demo`. The complete base URL is retained with checkout recovery IDs and must match before recovery. Old unscoped journals require explicit authorized recovery through the demo web workspace, not automatic tenant reassignment.
 
 The native authentication sources now use individual login, sign-out and session-revocation handling, but have not been compiled or run after those changes. They currently expose the initial takeaway checkout only; kitchen-only staff must use the web KDS until native kitchen screens exist. The new order history and KDS workspaces are implemented on the web; all clients' newly created orders receive a server-side kitchen ticket. Native workspace parity is a later task, not a verified feature today.

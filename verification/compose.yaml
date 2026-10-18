@@ -17,7 +17,10 @@ services:
       retries: 30
   backend:
     image: ${VERIFY_PROJECT:?runner project required}-backend
-    build: ../backend
+    build:
+      context: ../backend
+      labels:
+        org.opencontainers.image.revision: ${VERIFY_SOURCE_REVISION:-worktree}
     environment:
       TENANTS_JSON: ${VERIFY_TENANTS_JSON:?runner registry required}
       APP_ENV: ${VERIFY_APP_ENV:-verification}
@@ -33,7 +36,10 @@ services:
       retries: 30
   web:
     image: ${VERIFY_PROJECT}-web
-    build: ../web
+    build:
+      context: ../web
+      labels:
+        org.opencontainers.image.revision: ${VERIFY_SOURCE_REVISION:-worktree}
     ports:
       - '127.0.0.1::80'
     depends_on:

@@ -1,0 +1,41 @@
+name: counterline-staging
+services:
+  db:
+    image: postgres:17.5-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?Generate separate staging credentials}
+      STAGING_DB_PASSWORD: ${STAGING_DB_PASSWORD:?Generate separate tenant credentials}
+    volumes:
+      - staging-data:/var/lib/postgresql/data
+      - ./ops/init-staging.sh:/docker-entrypoint-initdb.d/tenant.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  backend:
+    image: ${BACKEND_IMAGE:?Select an already verified image tag or digest}
+    environment:
+      HOST: 0.0.0.0
+      APP_ENV: staging
+      TENANTS_JSON: ${TENANTS_JSON:?Configure the operator-owned tenant registry}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, java, -cp, '/app/lib/*', in.counterline.HealthCheck]
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 20
+  web:
+    image: ${WEB_IMAGE:?Select an already verified image tag or digest}
+    ports:
+      - '127.0.0.1:18088:80'
+    depends_on:
+      backend:
+        condition: service_healthy
+volumes:
+  staging-data:

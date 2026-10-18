@@ -128,7 +128,7 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
   return <div className="app">
     <aside className="sidebar">
       <a className="brand" href="/" aria-label="Counterline home"><span className="brandmark">c.</span>counterline</a>
-      <div className="outlet"><span className="outlet-icon">⌂</span><div><strong>Demo kitchen</strong><small>India · Single outlet</small></div><span className="dot"/></div>
+      <div className="outlet"><span className="outlet-icon">⌂</span><div><strong>{tenantSlug}</strong><small>India · Single-outlet preview</small></div><span className="dot"/></div>
       <div className="nav-label">WORKSPACE</div>
       <nav className="workspace-nav" aria-label="Workspace">{navigation.map(([key, icon, label]) => <button key={key} className={`nav-link ${shownView === key ? 'active' : ''}`} aria-current={shownView === key ? 'page' : undefined} disabled={busy || !connected} onClick={() => { setView(key); setError(''); }}><span aria-hidden="true">{icon}</span>{label}<span className="nav-arrow" aria-hidden="true">↗</span></button>)}</nav>
       {allowed('REPORTS_READ') && <section className="sales">
@@ -141,7 +141,7 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
     </aside>
     <main>
       <header className="topbar"><div><span className="eyebrow">YOUR COUNTER, CONNECTED</span><h1>{viewLabels[shownView]}<span>.</span></h1></div><div className="connection"><span className={`dot ${connected ? '' : 'muted'}`}/>{connected ? 'Session connected' : 'Not connected'}</div></header>
-      <div className="session-strip"><span>{session.staff.displayName} <small>· {session.staff.role.toLowerCase()}</small></span><button className="secondary" disabled={busy} onClick={() => void signOut()}>Sign out</button></div>
+      <div className="session-strip"><span>{session.staff.displayName} <small>· {session.staff.role.toLowerCase()} · Business: {tenantSlug}</small></span><button className="secondary" disabled={busy} onClick={() => void signOut()}>Sign out</button></div>
       {!connected ? <section className="connect-panel"><h2>{busy ? 'Opening your workspace…' : 'Workspace could not be loaded'}</h2><p>Signed in as {session.staff.username}. Existing checkout IDs will be recovered, not recreated.</p>{error && <p className="error" role="alert">{error}</p>}<button className="primary" disabled={busy} onClick={() => void perform(connect)}>Retry loading workspace</button></section> : <>
       {error && <div className="error" role="alert">{error} {pending && 'Your checkout ID is preserved. Retry this bill; do not create another.'}</div>}
       {suspended ? null : shownView === 'account' ? <PasswordView token={token} onChanged={passwordChanged}/> : shownView === 'staff' ? <StaffView token={token} ownId={session.staff.id}/> : shownView === 'menu' ? <MenuView token={token} onSaved={refreshMenu}/> : shownView === 'tables' ? <FrontDeskView token={token} canManage={allowed('TABLES_MANAGE')} canOrder={allowed('ORDERS_WRITE')} canPay={allowed('CASH_RECORD')} initialCheckId={checkToOpen} onOpened={() => setCheckToOpen(null)} onSettled={refreshReport}/> : shownView === 'orders' ? <OrdersView token={token} busy={busy} canOpen={canOpenOrder} onOpen={openOrder}/> : shownView === 'kitchen' ? <KitchenView token={token} canWrite={allowed('KITCHEN_WRITE')}/> : <div className="pos-layout">

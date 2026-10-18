@@ -1,132 +1,104 @@
-# Online checkout interface (v0 development)
+# Online tenant interface (development / staging preview)
 
-Base: `http://127.0.0.1:8080`. Except `/health`, `/ready` and `POST /api/auth/login`, send `Authorization: Bearer <accessToken>` from individual sign-in. Shared `STAFF_TOKEN` values are rejected. API request bodies are capped at 64 KiB; sensitive API responses use `Cache-Control: no-store`. POST bodies use `Content-Type: application/json`. Amounts are integer **paise**, not floating-point rupees. This is a single-outlet development interface, not an integration with Petpooja.
+Business API base: **`http://127.0.0.1:8080/t/demo/api`** for development; substitute an explicitly configured business code for another tenant. All table routes below are relative to that business API base. There is **no unscoped `/api` fallback**. Neither a client-supplied tenant field nor a header changes the selected database.
 
-| Method | Route | Result |
+Except `POST /auth/login`, send `Authorization: Bearer <accessToken>`. Each business has independent staff/session storage; a token from another business returns 401. Unknown businesses return 404 without creating a pool/database. Bodies use JSON, capped at 64 KiB; unknown properties/fractional integer fields are rejected. Responses use no-store. Money is integer **paise**, not floating-point rupees.
+
+At the server root only: `GET /health` returns liveness/mode/environment; `GET /ready` checks all configured tenant DBs (200/503), without listing them or credentials. They are not business APIs or complete operational monitoring.
+
+| Method | Business-relative route | Result |
 | --- | --- | --- |
-| GET | `/health` | Liveness and `demo-online` mode; not database readiness |
-| GET | `/ready` | PostgreSQL readiness (200 ready, 503 unavailable); no credentials in response |
-| POST | `/api/auth/login` | Individual username/password sign-in; opaque access token |
-| GET | `/api/auth/me` | Current staff profile and permissions |
-| POST | `/api/auth/logout` | Revoke the current session |
-| POST | `/api/auth/password` | Change own password and revoke all own sessions |
-| GET / POST | `/api/admin/staff` | Owner-only roster / staff creation |
-| POST | `/api/admin/staff/{id}` | Owner-only name, role and active-state change |
-| POST | `/api/admin/staff/{id}/password` | Version-guarded owner password reset; revokes target sessions |
-| GET | `/api/menu` | Available dishes with server prices, tax basis points, availability and version |
-| GET / POST | `/api/admin/menu` | Owner/manager full catalog / dish creation |
-| POST | `/api/admin/menu/{id}` | Version-guarded dish editing / availability |
-| POST | `/api/orders` | Atomically create a demo bill and one queued kitchen ticket; UUID replay recovers them |
-| GET | `/api/orders?status=OPEN&limit=25&before=100` | Payment-filtered history, newest bill first |
-| GET | `/api/kitchen?limit=50&after=100` | Oldest active tickets first, regardless of payment status |
-| POST | `/api/orders/{id}/kitchen` | Version-guarded preparation transition |
-| GET | `/api/orders/{id}` | Recover a bill and its current payment state |
-| POST | `/api/orders/{id}/cash-payment` | Atomically record physical cash received |
-| GET | `/api/reports/today` | Paid bill count and gross paid totals in Asia/Kolkata |
+| POST | `/auth/login` | Individual sign-in |
+| GET | `/auth/me` | Profile + permissions |
+| POST | `/auth/logout`, `/auth/password` | Revoke session / change own password |
+| GET / POST | `/admin/staff` | Owner staff roster / creation |
+| POST | `/admin/staff/{id}`, `/admin/staff/{id}/password` | Account editing / versioned password reset |
+| GET | `/menu` | Available dishes, choices, prices and versions |
+| GET / POST | `/admin/menu` | Owner/manager full catalog / creation |
+| POST | `/admin/menu/{id}` | Versioned menu update |
+| GET | `/tables` | All floor/table records with current open check ID |
+| POST | `/admin/tables`, `/admin/tables/{id}` | Owner/manager table create / versioned update |
+| POST | `/checks` | Open a table visit |
+| GET | `/checks/{id}` | Aggregate batches, payments, totals and current table |
+| POST | `/checks/{id}/batches` | Submit a new kitchen round |
+| POST | `/checks/{id}/transfer` | Move the whole check to an available table |
+| POST | `/checks/{id}/cash-payments` | Record an exact full/partial cash amount |
+| POST | `/checks/{id}/close-empty` | Release a check with no batches/payments |
+| POST | `/orders` | Standalone demo bill + kitchen ticket |
+| GET | `/orders`, `/orders/{id}` | History / recovery, including linked batches |
+| POST | `/orders/{id}/cash-payment` | Standalone bill cash recording only |
+| GET | `/kitchen` | Price-free active tickets |
+| POST | `/orders/{id}/kitchen` | Versioned preparation progress |
+| GET | `/reports/today` | Fully settled order/check count and gross sales, Asia/Kolkata |
 
-## Individual identity and permissions
+## Identity and permissions
 
-Sign in with `{"username":"owner","password":"<your password>"}`. Response: `{ "accessToken":"<opaque random token>", "expiresAt":"<UTC timestamp>", "staff":{ "id":"<uuid>","username":"owner","displayName":"Owner","role":"OWNER","active":true,"version":0 }, "permissions":[...] }`. Login names are normalized to lowercase; passwords are not trimmed. Credentials are not query parameters. `GET /auth/me` returns `{staff, permissions}`, not another token.
-
-Sessions are server-persisted using only a hash of the random token, expire absolutely after 8 hours, survive backend restart and are checked against the current account role/active state on every authenticated request. Logout revokes the presented token; password changes/resets and account updates revoke all target sessions. See `IDENTITY.md` for policy, current limits and operational gaps.
+Login body: `{"username":"owner","password":"<operator-supplied password>"}`. Response: `{accessToken,expiresAt,staff:{id,username,displayName,role,active,version},permissions:[...]}`. The token is opaque, independently random, persisted only as a hash and valid for eight hours unless revoked. Login names normalize to lowercase; passwords do not trim. Tokens remain client-memory-only. Password/account changes revoke sessions; they cannot roll back already-authorized in-flight work.
 
 | Capability | Owner | Manager | Cashier | Kitchen |
 | --- | --- | --- | --- | --- |
-| Available menu / order receipts / checkout / cash / daily gross sales | yes | yes | yes | no |
+| Menu/receipts/checks/cash/reports | yes | yes | yes | no |
+| Table administration | yes | yes | no | no |
 | Kitchen feed | yes | yes | read-only | yes |
-| Kitchen transition | yes | yes | no | yes |
-| Full catalog / dish editing | yes | yes | no | no |
+| Kitchen progress | yes | yes | no | yes |
+| Menu administration | yes | yes | no | no |
 | Staff administration | yes | no | no | no |
-| Own profile / password / logout | yes | yes | yes | yes |
+| Own profile/password/logout | yes | yes | yes | yes |
 
-Owner create: `{ "id":"<new UUID>", "username":"cashier.one", "displayName":"Cashier One", "role":"CASHIER", "password":"<unique 12–128 character password>" }`. Reuse the ID and identical values if the response is uncertain; usernames are unique. Do not store a fast fingerprint of passwords. Staff editing: `{ "displayName":"Cashier One", "role":"CASHIER", "active":false, "expectedVersion":0 }`. Updating revokes existing sessions; the owner cannot disable/demote itself. Conflicting stale versions return 409. No delete operation rewrites historical attribution.
+Staff create: `{id,username,displayName,role,password}` with a new UUID and 12–128 character password. Editing: `{displayName,role,active,expectedVersion}`. Reset another account: `{newPassword,expectedVersion}`. Own password: `{currentPassword,newPassword}`. Owner cannot disable/demote itself. Exact immediate updates/resets may replay; conflicting stale values return 409. Usernames are unique **within the business**, not globally. See `IDENTITY.md` for rate limits and production gaps.
 
-Own password: `{ "currentPassword":"...", "newPassword":"..." }`; success requires signing in again. Owner reset for another account: `{ "newPassword":"...", "expectedVersion":0 }`. Exact immediate reset replays do not revoke a newly issued session again. A stale reset cannot overwrite a later password change. The owner must use own-password change (with the current password) for itself.
+## Catalog and configured dishes
 
-## Catalog administration
-
-Create: `{ "id":"<client-selected lowercase UUID or slug>", "item": { "name":"Paneer special", "category":"Mains", "pricePaise":14950, "cgstBps":250, "sgstBps":250, "vegetarian":true, "available":true } }`.
-
-Update `/admin/menu/{id}` with `{ "expectedVersion":0, "item":{...same fields...} }`. IDs are immutable. Supported demo CGST/SGST pairs are equal: 0, 250, 600, 900, 1400 basis points per component. Price is 1..100,000,000 paise. No inclusive pricing, IGST, cess, variants or add-ons exist yet. This is not a tax-compliance claim.
-
-Create retries with the same ID/normalized values recover the existing dish; a different creation intent under that ID returns 409. Exact immediate update replay returns the same version. Other stale writes return 409 and require refresh/review, not automatic version substitution. Unavailable dishes disappear from `/menu` but remain in the admin catalog; historical bill snapshots do not change. Client cart prices are estimates only—new order pricing is owned by the server.
-
-## Create a bill
+Create `/admin/menu`:
 
 ```json
-{
-  "id": "b424548f-a5c9-4317-9cd2-85694d903301",
-  "lines": [{"itemId":"masala-dosa","quantity":2},{"itemId":"filter-coffee","quantity":1}],
-  "orderType":"DINE_IN",
-  "tableLabel":"Table 04"
-}
+{"id":"paneer-special","item":{"name":"Paneer special","category":"Mains","pricePaise":10000,"cgstBps":250,"sgstBps":250,"vegetarian":true,"available":true,"variants":[{"id":"large","name":"Large","pricePaise":15000,"available":true}],"addons":[{"id":"cheese","name":"Cheese","pricePaise":2000,"available":true}]}}
 ```
 
-Use a fresh UUID for a new sale and retain it **before sending**. Retrying the same request must reuse its UUID. Never create a new ID merely because a request timed out. Line order and table whitespace are normalized; duplicate item IDs are rejected. Up to 50 unique items, each quantity 1–99. `DINE_IN` requires a table label (up to 40 characters); `TAKEAWAY` forbids one. No client-supplied prices or totals are accepted.
+Update `/admin/menu/{id}`: `{expectedVersion,item}`. Dish/choice IDs use 3–64 lowercase letters/digits/hyphens, starting with a letter/digit. Up to 20 variants and 20 add-ons, unique within their list. Variant prices are absolute serving prices (replace the base); add-ons are charged once per serving and inherit the dish's demo tax rate. When variants exist, one available variant is required. Add-ons are optional, each selected at most once. Dish/variant prices: 1..100,000,000 paise; add-ons may be zero.
 
-Response shape:
+Supported equal CGST/SGST rates per component: 0, 250, 600, 900, 1400 basis points. This is demo tax configuration, not compliance advice. Existing bill descriptions/prices/taxes never change when catalog values change. Create IDs recover the same normalized intent; conflicting IDs/stale updates return 409. Availability replaces deletion of historical identities.
+
+## Standalone order/bill
 
 ```json
-{
-  "bill": {
-    "id":"b424548f-a5c9-4317-9cd2-85694d903301",
-    "billNumber":"DEMO-000001",
-    "createdAt":"2026-10-16T12:00:00Z",
-    "orderType":"DINE_IN",
-    "tableLabel":"Table 04",
-    "lines":[
-      {"itemId":"filter-coffee","name":"Filter coffee","quantity":1,"unitPricePaise":6000,"cgstBps":250,"sgstBps":250,"subtotalPaise":6000,"cgstPaise":150,"sgstPaise":150},
-      {"itemId":"masala-dosa","name":"Masala dosa","quantity":2,"unitPricePaise":14000,"cgstBps":250,"sgstBps":250,"subtotalPaise":28000,"cgstPaise":700,"sgstPaise":700}
-    ],
-    "subtotalPaise":34000,"cgstPaise":850,"sgstPaise":850,"totalPaise":35700,
-    "currency":"INR","demo":true
-  },
-  "status":"OPEN","paidAt":null,"cashReceivedPaise":null,
-  "kitchen":{"status":"QUEUED","version":0,"updatedAt":"2026-10-16T12:00:00Z"},
-  "createdBy":"<authenticated staff UUID>","paidBy":null
-}
+{"id":"b424548f-a5c9-4317-9cd2-85694d903301","lines":[{"itemId":"paneer-special","quantity":2,"variantId":"large","addonIds":["cheese"]}],"orderType":"TAKEAWAY","tableLabel":null}
 ```
 
-`createdBy` and `paidBy` are server-assigned staff attribution (null for pre-identity historical records); clients cannot supply them. New order/ticket creation, kitchen progression, settlement and their audit events commit atomically. `bill` is an immutable server snapshot. `status` is `OPEN` or `PAID`, derived from persisted payment state. Replays return current payment state, not a new bill. HTTP 200 is used for both creation and replay. Bill numbers may have gaps; these demo numbers are **not GST invoice numbers**.
+Retain the UUID before sending, and reuse it for uncertain retries. Up to 50 distinct **dish configurations**, quantity 1–99 each; same item with different choices is allowed. Duplicate configurations must combine quantities. Choice order and line order are canonicalized. Missing/null variant and absent/empty add-ons are equivalent for a base dish. No client prices/totals/actor IDs are accepted.
 
-## Record cash
+Standalone DINE_IN + tableLabel is retained for old clients (printable label, ≤40 characters), but does not reserve a table; new dine-in work must use checks. Direct `/orders` requests cannot attach a `checkId`.
 
-```json
-{"receivedPaise":35700}
-```
+An `Order` contains immutable `bill:{id,billNumber,createdAt,orderType,tableLabel,lines,subtotalPaise,cgstPaise,sgstPaise,totalPaise,currency,demo}`, payment `status,paidAt,cashReceivedPaise`, `kitchen:{status,version,updatedAt}`, actor IDs, optional `checkId` and `currentTableLabel`. Bill lines contain item ID, snapshotted description including selected choices, quantity, unitPricePaise, tax rates and line totals. Prices are not looked up when reopening a receipt. Bill numbers may have gaps and are **not legal GST invoice numbers**.
 
-The amount must cover the bill and be at most 1,000,000,000 paise (INR 1 crore). UI clients currently offer exact cash only. This operation records a staff assertion that physical cash was received; it never debits an account or verifies digital payment. Same-amount retries return the existing settlement; a different amount after settlement returns 409. Row locking protects settlement against concurrent retries. Failed or timed-out responses require recovery/retry, not another physical payment.
+Standalone cash body: `{receivedPaise}` covering the total and ≤1,000,000,000 paise. Exact same-amount replay returns the existing settlement; a different paid amount returns 409. Linked batches reject this route with `check_settlement_required`—settle their parent check instead. Cash is recorded, never processed or digitally verified.
 
-## Order history and recovery
+## Tables and running checks
 
-`GET /api/orders` accepts `status=ALL|OPEN|PAID` (default ALL), `limit=1..100` (default 25), and optional positive numeric `before` cursor. Results are ordered by descending bill sequence, not by last payment time. Response: `{"orders":[...Order],"nextCursor":"100"}`; `nextCursor` is null when no further page exists. Pass it as `before` for the next older page. Cursors are bill sequence values, not offsets; sequence gaps are normal. Payment status can change between requests; pages are not a frozen reporting snapshot.
+Table create: `{id,table:{label,floor,seats,active}}`; update `{expectedVersion,table}`. Labels ≤40 characters, floors ≤60, seats 1–100. Location names are case-insensitively unique within each business. Occupied tables cannot be edited/deactivated. Up to 200 tables in the current preview.
 
-Use `GET /api/orders/{id}` to get current payment/kitchen state. Parking is only a web-counter action to set aside a persisted open bill; it does not change its server payment status or suspend kitchen work. No unsaved cart is parked. A paid bill can be reopened for viewing/printing without creating another sale.
+Open: `{id,tableId}`. Only active, free tables can open. Reusing the exact opening ID/table returns the current check, even after transfer/closure; it does not reopen a visit.
 
-## Kitchen tickets and guarded progress
+Submit: `{id,expectedVersion,lines:[...CartLine]}`. The command ID also identifies its immutable batch bill and ticket. Each new round queues only those dishes; prior rounds are not resent. Maximum 100 batches/check and 1,000,000,000 total paise. A first recorded payment locks further additions.
 
-New bill + queued ticket are committed in the same transaction. Retrying order creation does not enqueue another ticket. Historical orders created before this feature have `kitchen: null`; they remain recoverable but are not silently sent to the kitchen or assumed served.
+Transfer: `{id,expectedVersion,tableId}` to an active, free table. Previous batch bill table labels remain snapshots; KDS projects the **current** table so food follows the party.
 
-`GET /api/kitchen` accepts `limit=1..100` (default 50) and optional positive numeric `after` cursor. It returns `{orders:[...KitchenOrder],nextCursor}`, oldest bill sequence first, only QUEUED/PREPARING/READY tickets. A KitchenOrder contains only bill identity/time/type/table and item ID/name/quantity, plus payment status and kitchen state. It does **not** expose prices, taxes, totals, cash received or staff attribution. Use `nextCursor` as `after` for later tickets. Served tickets remain in order history, not the active kitchen feed. Counts in the UI describe the loaded page, not all tickets.
+Cash: `{id,expectedVersion,amountPaise}`, positive and no more than the outstanding balance. Exact received amounts only; no change, gateway confirmation, per-guest allocation or per-item split. Maximum 200 payments. Full coverage closes the check and releases its table immediately, regardless of kitchen progress. Empty release: `{id,expectedVersion}` at `/close-empty`, allowed only with zero batches/payments.
 
-Advance with `POST /api/orders/{id}/kitchen`:
+Check commands persist exact intent/fingerprint. Replays return the latest aggregate without repeating the mutation, even if later commands have advanced/closed it; a reused command ID with different intent returns 409. New commands must use the observed version. Refresh/review after 409; never silently substitute a new version into an uncertain command.
 
-```json
-{"status":"PREPARING","expectedVersion":0}
-```
+`RunningCheck` includes `{id,number,table,version,createdAt,closedAt,status,batches,payments,totalPaise,paidPaise,duePaise}`. Status: OPEN before payments, SETTLING after partial payment, CLOSED after settlement/empty release. Payments contain ID, amount, time and receiving staff ID. Batch paid flags are updated together only at full settlement; the immutable bill snapshots do not change.
 
-The only legal chain is **QUEUED → PREPARING → READY → SERVED**. The server locks the ticket row and checks the observed version before updating. A successful transition increments version exactly once and returns the current price-free KitchenOrder. The exact previous transition (same target and expectedVersion) can be replayed while the ticket is still at that immediately resulting state. It returns the same state, not a second advancement. If another stage has since completed, the old request returns 409 and the client must refresh/reconcile; it must not automatically substitute a fresh version and advance again.
+## History, kitchen and reports
 
-Expected errors: `stale_kitchen_ticket` / `invalid_kitchen_transition` (409), invalid version/body (400), `no_kitchen_ticket` (404). After an uncertain network/5xx outcome, retry the **same target and version**, not the next stage. The web workspace retains this intent while open; it is not a durable offline outbox.
+Orders: `status=ALL|OPEN|PAID`, `limit=1..100` (default25), positive bill-sequence `before` cursor. Response `{orders,nextCursor}` newest first. `Order.checkId` tells clients to open the parent check, not offer standalone payment. Closed check recovery is by ID or a linked batch from order history; parking is only client navigation, not another server payment state.
 
-Kitchen state and payment state are independent: PAID can still be QUEUED, and SERVED can still be OPEN. Cash recording never marks food served. No kitchen rollback, recall, cancellation, per-item/station routing or add-on tickets exist yet. Only OWNER, MANAGER and KITCHEN may advance tickets; CASHIER may view the price-free feed but cannot advance it. Kitchen-only staff cannot fetch financial order receipts, menu prices or sales reports.
+Kitchen: `limit=1..100` (default50), positive bill-sequence `after` cursor, oldest active first. Response `{orders:[KitchenOrder],nextCursor}`. It exposes bill identity/time/type/current table, item descriptions/quantities and payment/preparation state, never prices/taxes/cash/staff attribution. Legacy orders without tickets remain unchanged, not silently queued.
 
-## Errors
+Kitchen progress body: `{status:"PREPARING",expectedVersion:0}`. Only QUEUED → PREPARING → READY → SERVED. Exact immediate transition retry is safe; stale/later-stage retries require reconciliation. SERVED means food completion, not payment. No station routing, recall or cancellation yet.
 
-Expected errors use `{"code":"...","message":"..."}`. Examples: `unauthorized` / `invalid_credentials` (401), `forbidden` (403), `login_rate_limited` / `authentication_busy` (429), `body_too_large` (413), `invalid_order`/`invalid_id`/`unavailable_item` (400), `not_found` (404), `id_conflict`/`already_paid` (409). A 400 on order creation definitively rejects the request. A transport failure or 5xx does not prove whether the transaction committed: keep the ID and recover it. Unknown JSON fields and fractional integer values are rejected. Generic framework routing/media-type failures may have framework response bodies.
+`reports/today` returns `{date,timezone,paidOrders,totalPaise}`. A fully settled multi-batch check counts **once**, not once per batch. Partial check cash remains visible on the check and is not recognized as paid sales until final settlement. This is not a cash-shift reconciliation report. Each line's CGST and SGST round independently HALF_UP to one paisa before summing.
 
-## Tax and later offline work
+## Failure semantics
 
-250 basis points = 2.5%. Compute each line's taxable subtotal using server unit price × quantity, then round CGST and SGST independently HALF_UP to one paisa. Sum the rounded line taxes. This is a demo policy only; obtain tax/accounting validation before using real transactions.
-
-Client IDs, immutable bill snapshots, and idempotent state transitions are useful prerequisites, **not an offline protocol**. Offline work still requires tenant/outlet/device scoping, versioned menus/tax policy, local storage/outbox, conflict rules, reconciliation, and legal invoice numbering decisions.
+Expected problems use `{code,message}`: 400 invalid/unavailable choices/body; 401 invalid/expired/revoked session; 403 role denial; 404 unknown tenant/entity; 409 stale/conflicting command; 413 body cap; 429 bounded auth/rate controls. Routing errors may use framework bodies. A transport failure or 5xx does **not** prove a mutation failed—keep its ID and recover/retry the same intent. Client retry journals are not offline sales or a multi-device sync protocol.

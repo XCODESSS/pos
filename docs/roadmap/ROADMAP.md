@@ -1,54 +1,52 @@
-# Counterline — full integrated product roadmap
+# Counterline — evolutionary multi-tenant SaaS roadmap
 
-## Outcome and authority
+## Outcome and confirmed scope
 
-Build one staff-facing restaurant product for India/INR across web, native Kotlin/Compose Android and native SwiftUI iOS/iPadOS. The user explicitly requested **all** proposed capabilities, one by one, and clarified that the target is the **entire end-to-end product**, not a few services. Required scope and completion contract: `../../PRODUCT.md`.
+One integrated staff-facing restaurant product for independent businesses in India/INR, delivered through web, Kotlin/Compose Android and SwiftUI iOS/iPadOS. The user confirmed **multi-tenant SaaS** on 2026-10-18 and requested an evolutionary prototype with a safe pre-production/production path. A tenant is a business; outlets are its locations. Full product contract: `../../PRODUCT.md`.
 
-Offline operation is confirmed and sequenced after stable online workflows. Staff-only does not exclude owner-managed customer/loyalty records; it excludes a separate customer-ordering app. Use original code/branding and evidence from public workflows. REA is an analysis/verification tool, not the application framework. No private Petpooja account/artifact or verified parity inventory exists.
+Offline remains required after stable online workflows. All requested inventory, business-control and loyalty capabilities remain in scope; this foundation milestone postpones their implementation, not their delivery. REA is a separate authorized observation tool, not the application framework or evidence of private Petpooja parity.
 
-## NOW — connected identity/catalog/order core
+## NOW — verified evolutionary prototype foundation
 
-Implemented: individual staff accounts and backend-enforced roles; password/session lifecycle; owner staff administration; owner/manager base menu administration; menu/availability changes feeding real checkout; immutable server-priced demo bills; parked/open/paid history; role-limited KDS; cash settlement, attribution, transactional audit events and IST gross daily sales.
+Outcome: version-controlled, reproducibly verifiable software with cross-business isolation and a separately configured local staging/recovery path. Spec: `FOUNDATION.md`; executable tasks: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
 
-Observed evidence: real PostgreSQL HTTP checks, a 43-action browser journey spanning owner → cashier → kitchen → cashier, successful host builds, both Docker image builds, healthy full Compose startup, packaged role/API checks, and a packaged browser login/admin/logout flow. References: `FINDINGS.md` and `.local/rea-product-flow-evidence.json` / `.local/rea-packaged-product-evidence.json`.
+Current implementation: connected staff/catalog/order/KDS/cash flow, variants/add-ons, tables/running checks/multiple batches/transfers/amount-based cash splits. Public interfaces run against disposable PostgreSQL databases, not development data. A shared application routes explicitly to separate tenant databases. Database identity binds business + environment; non-development fresh catalogs exclude demo fixtures. Decision/trade-off: D-008.
 
-Not complete: variants/add-ons; real venue/table/check model; native admin/KDS parity; agreed durable regression suite; public production security/tax/hardware/operations gates. The existence of a Docker stack does not finish the product.
+Exit evidence:
+- Honest Git baseline and small coherent local commits; no secret artifacts or push.
+- Host/package builds and public-interface regression cases for prices, permissions, snapshots, retries/concurrency and check reconciliation.
+- Two independent businesses reuse usernames/item IDs without token/data/report leakage; wrong tenant/environment startup refuses service.
+- REA desktop flow, narrow-screen recovery and tenant-journal switching; observed results distinguished from physical-device checks.
+- Real backup/restore into a fresh disposable database preserves receipts, splits, sales and session facts.
+- The same verified image objects run against a separate, empty local staging database with distinct secrets; release/migration/rollback/recovery procedures are explicit.
 
-### Immediate next connected increment
+Production is not the exit claim. Hosted TLS/monitoring, privileged-role separation, fiscal policy, tenancy lifecycle, native/toolchain and hardware gates remain open. Current evidence and any unfinished acceptance conditions: `STATE.md`.
 
-Introduce catalog choices and the running-check/table model before adding more financial behaviors. A party can submit multiple kitchen batches to one check, transfer tables and split settlement without rewriting old paid receipt snapshots, duplicating dishes/cash or losing menu/tax versions. Extend actual staff screens and the shared backend together; do not substitute unrelated CRUD endpoints for the operating journey.
+## NEXT — integrated online product and SaaS operating model
 
-Dependencies: preserve current order/receipt data; define check ownership, item/variant/add-on identity, transfer and split-allocation rules; establish outlet scoping; agree public HTTP/staff UI regression seams. Tax and legal invoice numbering still need accounting validation before live use.
+1. **Inventory and recipes:** ingredient units/versioned recipes, receiving/purchasing, wastage and low-stock views; consume stock exactly once on accepted kitchen submission. Record adjustments/reversals rather than silently changing stock.
+2. **Business control:** expenses, cash shifts/closing, reconciliation and useful sales/item/stock reports. Separate cash receipts from sales recognition; define immutable refund/credit-note policies.
+3. **Customers and loyalty:** consent-aware records, benefits and points tied to real settlements with safe retries/reversal rules.
+4. **SaaS lifecycle and outlets:** approved tenant provisioning/offboarding, subscription/access policy, configuration/backup/migration fleet operations and multi-outlet memberships/permissions. Current database isolation is not onboarding automation. Decide pilot scale and capacity before increasing the bounded tenant registry.
 
-Exit evidence: real table/check scenario with at least two submissions, kitchen progress, transfer, split money allocations and a reconciled final state; old standalone paid bills remain readable and unchanged. Native parity must be tracked explicitly, not inferred from web proof.
+Each increment includes persistence, migrations, permissions, actual staff UI, recovery and regression evidence. Extend the existing operating journey instead of creating disconnected CRUD demonstrations. Native parity remains a tracked requirement, not a web-only redefinition.
 
-## NEXT — required online capabilities (not optional backlog)
+## REQUIRED AFTER STABLE ONLINE — offline continuity
 
-1. **Inventory/recipes/purchasing/wastage:** canonical units and versioned recipes; deduction tied exactly once to accepted food submission; receiving, adjustments, low-stock views and movement history. Cancellation/reversal/waste policy must be explicit, not guessed.
-2. **Business control:** expenses, cash shifts and closing, payment reconciliation and useful sales/item/stock reports. Financial events must reconcile; refunds/credit notes require an explicit immutable accounting policy. Existing daily gross totals are not completion of this milestone.
-3. **Customer loyalty:** customer records and consent-aware history; points/offers attached to real settlements with retry-safe earning/redemption and reversal rules. No fake points for abandoned drafts.
+Registered outlet/device identity, versioned menu/tax/recipe facts, durable local command outbox, interrupted-sync and conflict handling, legal numbering and multi-device reconciliation. Distinguish internet loss from local-network loss. Never infer digital-payment success from a device assertion or network failure.
 
-All increments require usable screens, migrations, permission enforcement, persistence and recovery behavior connected to the existing operating flow. Introduce capabilities in that sequence rather than building detached service demos.
+## Pre-production to pilot release gates
 
-## REQUIRED AFTER ONLINE — offline continuity
-
-Local menu/order storage, registered device identity, versioned prices/taxes/recipes, durable command outbox, safe replay, conflict handling and reconciliation. Decide internet outage versus local-network outage behavior and legal offline invoice numbering. Demonstrate interrupted sync and duplicate prevention across devices. Never infer online payment success from an offline client assertion.
-
-## Cross-platform and pilot gates
-
-- Native Android/iOS must cover the intended staff flows, not only the current takeaway checkout. Real phones are available; Android SDK location remains unconfigured, and Mac/Xcode/signing access is not established.
-- Configure trusted HTTPS for remote/phone use. Add outlet/tenant isolation, security review, recovery/MFA/idle-session decisions, monitoring and backup/restore verification before public exposure.
-- Validate actual printers/drawers, accessibility, mobile lifecycle, tax policy, GSTIN/fiscal numbering, invoice/credit-note handling and failure recovery.
-- Payment gateways and delivery integrations require provider access/approval and a separately selected scope; local recorded cash is not digital payment processing.
-
-## Direction beyond the core
-
-Multi-outlet operational management and authorized external integrations can build on verified isolation/accounting rules. Do not invent feature-parity claims, dates, commercial access, external deployment authority or app-store readiness.
+- Separate migration/runtime database privileges, hosted HTTPS/ingress/proxy trust, secret rotation, identity recovery/MFA/idle decisions, security/isolation-abuse and load review.
+- Monitoring/alerts, audit access policy, encrypted off-host backups/retention, measured restore objectives, incident/support and migration/rollback rehearsals. Readiness checks alone do not satisfy observability.
+- Tax/accounting validation for India GST, fiscal numbering, refunds/credit notes and historical reconciliation. Configurable demo tax is not compliance.
+- Successful Android/iOS builds, complete native workflows, real phones, printers/drawers, accessibility and failure recovery. Android SDK configuration and Mac/Xcode/signing are unresolved prerequisites.
+- A bounded pilot scope and explicit fallback/reconciliation process. No public deployment, provider access, app signing or live cash is implied by local verification.
 
 ## Major risks
 
-- Prototype immutable bills are not running checks; expanding table/split workflows requires a deliberate financial model.
-- Public marketing pages do not establish private app behavior or backend implementation.
-- A configurable demo GST rate is not legal compliance.
-- Offline multi-device identity, numbering and reconciliation are architectural work, not caching.
-- Native toolchains/signing, hardware and external provider access are independent verification dependencies.
+- Database-per-tenant simplifies current isolation but adds provisioning, backup, migration and connection overhead. Large fleets need a reviewed control plane/pooling strategy; shared-schema migration is not an invisible implementation detail.
+- Single-outlet role models do not automatically become multi-outlet memberships.
+- Current exact amount splits are not guest/item allocation; adding dishes after settlement starts is deliberately disallowed.
+- Prototype receipts, gross-sales totals and recorded cash are not fiscal invoices, a cash ledger or payment-provider confirmation.
+- Offline/device and native hardware/toolchain requirements cannot be replaced by browser screenshots.
