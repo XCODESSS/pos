@@ -70,6 +70,7 @@ try {
   environment.VERIFY_TENANTS_JSON = registry;
   if (wrongTenant.code === 0 || !wrongTenant.output.includes('identity mismatch')) throw new Error('Wrong-tenant startup was not rejected for the expected reason.');
   console.log('Startup probes: mismatched tenant/environment identities rejected.');
+  if (process.argv.includes('--browser')) await run(process.execPath, ['verification/browser.mjs']);
 } catch (cause) {
   console.error(redact(cause instanceof Error ? cause.message : String(cause)));
   process.exitCode = interrupted ? 130 : 1;

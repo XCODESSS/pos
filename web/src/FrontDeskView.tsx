@@ -30,8 +30,9 @@ export function FrontDeskView({ token, canManage, canOrder, canPay, initialCheck
   const [busy, setBusy] = useState(false); const lock = useRef(false); const mounted = useRef(true);
   const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [loaded, setLoaded] = useState(false);
   const [amount, setAmount] = useState(''); const [destination, setDestination] = useState(''); const [recover, setRecover] = useState('');
+  const [cashConfirmation, setCashConfirmation] = useState<{ command: Command; amountPaise: number } | null>(null);
   const lines = draft?.checkId === selected ? draft.lines : [];
-  const blocked = busy || pending !== null || !loaded;
+  const blocked = busy || pending !== null || cashConfirmation !== null || !loaded;
   const editable = !!check && check.status === 'OPEN' && canOrder;
   const draftRef = useRef(draft); draftRef.current = draft;
   const selectedRef = useRef(selected); selectedRef.current = selected;
@@ -124,8 +125,8 @@ export function FrontDeskView({ token, canManage, canOrder, canPay, initialCheck
       if (!/^\d{1,8}(\.\d{1,2})?$/.test(amount)) { setError('Enter an exact cash amount in INR, with up to two decimal places.'); return; }
       const [whole, fraction = ''] = amount.split('.'); paise = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
     }
-    if (!window.confirm(`Confirm you physically received ${money(paise)} in cash? The first payment locks dish additions.`)) return;
-    void execute({ kind: 'check', path: `/checks/${check.id}/cash-payments`, body: { id: crypto.randomUUID(), expectedVersion: check.version, amountPaise: paise } });
+    if (paise < 1 || paise > check.duePaise) { setError('Cash must be positive and cannot exceed the balance due.'); return; }
+    setCashConfirmation({ amountPaise: paise, command: { kind: 'check', path: `/checks/${check.id}/cash-payments`, body: { id: crypto.randomUUID(), expectedVersion: check.version, amountPaise: paise } } });
   }
   const destinations = tables.filter(table => table.active && !table.checkId);
   const floors = [...new Set(tables.map(table => table.floor))];
@@ -133,6 +134,7 @@ export function FrontDeskView({ token, canManage, canOrder, canPay, initialCheck
     <div className="workspace-notice">A table is released after full settlement, even if food is still preparing. The first payment locks additions. Sales recognize the full check only on final settlement; partial cash is listed on the check. Splits are by amount, not by guest/item. Demo bills are not GST invoices.</div>
     {error && <p className="error" role="alert">{error}</p>}{notice && <p className="success-note" role="status">{notice}</p>}
     {pending && <div className="recovery-banner"><p>{busy ? 'Saving…' : 'An action is unconfirmed. The exact request is saved in this browser tab. Retry it before doing anything else.'}</p><button className="primary" disabled={busy} onClick={() => void execute(pending)}>Retry same front-desk action</button></div>}
+    {cashConfirmation && <section className="cash-confirmation" aria-label="Confirm received cash" role="region"><h3>Confirm physical cash received</h3><p>Amount: <strong>{money(cashConfirmation.amountPaise)}</strong>. The first payment locks dish additions. This records cash; it does not process a digital payment.</p><button className="primary" disabled={busy} onClick={() => { if (lock.current) return; const command = cashConfirmation.command; setCashConfirmation(null); void execute(command); }}>Confirm cash received</button><button className="secondary" disabled={busy} onClick={() => setCashConfirmation(null)}>Cancel cash confirmation</button></section>}
     <div className="floor-board">{floors.map(floor => <section key={floor}><h3>{floor}</h3><div className="table-grid">{tables.filter(table => table.floor === floor).map(table => <button key={table.id} className={`table-card ${table.checkId ? 'occupied' : ''}`} disabled={blocked || (!table.checkId && (!table.active || !canOrder))} onClick={() => openTable(table)}><strong>{table.label}</strong><span>{table.seats} seats</span><small>{table.checkId ? 'Occupied · open check →' : table.active ? 'Available · open table' : 'Inactive'}</small></button>)}</div></section>)}</div>
     {loaded && !tables.length && <p className="workspace-notice">No tables yet. {canManage ? 'Create your floor and first table below.' : 'Ask an owner or manager to create tables.'}</p>}
     <form className="recover-form" onSubmit={event => { event.preventDefault(); void openExisting(recover.trim()); }}><label htmlFor="recover-check">Recover check by ID</label><input id="recover-check" value={recover} required maxLength={36} placeholder="Check UUID, including closed receipts" onChange={event => setRecover(event.target.value)}/><button className="secondary" disabled={blocked}>Open check</button></form>
