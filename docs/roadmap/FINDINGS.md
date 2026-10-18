@@ -1,5 +1,28 @@
 # Findings
 
+## 2026-10-18 — Physical stock reconciliation
+
+Continued from inventory `2811b31` on local `feat/stock-reconciliation`. First count HTTP test returned404 before implementation; after additive V8/module integration it passed. Expanded public regression cases cover immutable variance, zero-variance observations, concurrent/reordered exact replay, changed intent, stale multi-line atomic rejection, submission/count races, negative-stock numeric bounds, roles and tenants. Existing migrations unchanged; no stock/payments inferred from historical counts.
+
+Final command: `node verification/run.mjs --host-backend --upgrade-from=counterline-backend:9cb1e27 --browser`, installed REA/Chrome environment paths. All24 acceptance cases (22 core + fresh environment + restore) passed, plus V5→V8 preservation, startup identity mismatches and cross-database CONNECT denial. Restore into a new database preserved the count/document/linked movement and unchanged replay, alongside negative-stock/recipe/order/cash/session facts. Host TypeScript production build passed. Host-offline Gradle build was explicitly packaged in Docker; default container dependency downloads and remote CI remain unverified.
+
+REA observed a real reviewed −50g →25g count with one+75g correction. A5g delivery during the next count caused409; a narrow-screen saved-command replay returned original evidence without overwriting the now30g balance and cleared its pending journal. Earlier bill stock evidence remained unchanged. Screenshots of desktop count results and390px recovery were reviewed. No native/device/Safari claim.
+
+Ignored complete evidence: `verification/.artifacts/counterline-verify-eeec190711d1/`; log `.local/counts-full-gate.log`. Nine successful scenarios (step totals include initial state):
+- Front desk46: `ev_47f09df9babf315fdecb4d654d035890d60402565725e882ec5141b42c9872c6`.
+- Narrow9: `ev_e0b2eb5090893ff0d7af658145e5642158860476e0405bdc342010d4b5ce1cba`.
+- Tenant switch6: `ev_985de11cbfdd60b074104b4aed4b528e99323f88923cc6cc9c93a7ea7cfe3dfd`.
+- Inventory setup30: `ev_ae4abab65512c28f2ab78339f6a7a5b8b392098790ccfe28b30753f5386ff708`.
+- Inventory workflow39: `ev_25a2865bb43bb29bf1d376ac4e6665efaed9fb7e1df00c58b85d2975b60407a8`.
+- Inventory narrow8: `ev_cd02b8b2140ec5faf5cfe93df317b752f56c5071862ac9ac620a09998a370883`.
+- Count19: `ev_0ac8e8413d377e4478a6dc24cdbeec591ec7911ff93577b4a8c526eeec611656`.
+- Stale count19: `ev_2e5ab9814183b5320f61518ff606ec31085885aeeb271742750de7ad801eabc1`.
+- Narrow count recovery11: `ev_04978384d51387fe9c01358c6a999361fc4d6528351fce65841ba3f7bda4276f`.
+
+Harness finding: expanded tests exhausted the shared fixture owner's30-sign-ins/15-minute bucket. REA actions without deadlines waited indefinitely for post-login controls, and the outer runner killed the capture without evidence. Explicit per-action deadlines revealed the429 login message. Dedicated disposable browser owners and owner-session reuse within count tests resolve it without changing production authentication. Redacted CLI failure artifacts retain exit/timeout diagnostics. A new browser assertion initially used `order.id` instead of the existing `order.bill.id`; corrected to the documented interface and now asserts200 before comparing immutable stock evidence.
+
+Development/staging stayed stopped; only generated verification containers/volumes were removed. No promotion/push. Supplier purchasing/bills/payment, valuation, schedules and native parity remain open work.
+
 ## 2026-10-16 — What REA provides
 
 Evidence: `../rea/README.md`, `../rea/DISCLAIMER.md`, and the REA workflow skill. REA inspects selected artifacts/runtime observations and returns evidence. It is not a hosted POS backend or application framework. Cloning it does not recover Petpooja's server implementation.

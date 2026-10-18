@@ -2,12 +2,22 @@
 
 Updated: 2026-10-18
 Target: integrated staff-facing multi-tenant SaaS for India/INR, web + Kotlin Android + SwiftUI iOS/iPadOS
-Current milestone: connected inventory/recipes with warning-only shortages
-Status: backend/web inventory, upgrade/restore and browser flows pass in disposable environments; native/toolchain and production/SaaS lifecycle gates remain open
+Current milestone: physical stock reconciliation verified; supplier purchasing next
+Status: backend/web inventory/counts, upgrade/restore and browser flows pass in disposable environments; native/toolchain and production/SaaS lifecycle gates remain open
 
 ## Scope and architecture
 
 Independent restaurant businesses are separate tenants. The current shared backend uses explicitly registered database-per-tenant runtimes; each tenant currently has one outlet. No public signup, subscription control plane or multi-outlet memberships exist. Architecture trade-off: D-008. Full contract: `../../PRODUCT.md`. Foundation spec: `FOUNDATION.md`; execution plan: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
+
+## Physical stock counts — 2026-10-18
+
+- Continued from inventory commit `2811b31` on `feat/stock-reconciliation`, without merging/promoting. Spec/work checklist: `STOCK-COUNTS.md`.
+- Owner/manager counts 1–100 ingredients, reviews recorded/count/variance quantities and confirms an attributable correction. V8 stores immutable count evidence; nonzero COUNT movements link to it. Zero-variance observations persist without artificial movements. Existing V1–V7 are unchanged.
+- Shared inventory locking makes count/submission races safe. Any stale line rejects the entire count. Concurrent/reordered exact command replay returns original evidence without overwriting later stock; changed intent rejects. Negative stock recovery, exact quantity bounds, roles, tenant isolation and paginated history are exercised publicly.
+- Web keeps draft observed versions fixed, explicitly discards/reloads stale counts, retains uncertain commands by business and recovers by count ID. REA observed −50g recorded →25g physical →+75g correction; a later5g delivery made a draft stale and remained30g after both rejection and old-command replay. Reviewed desktop/390px screenshots; no native parity claim.
+- Full gate passed24 acceptance cases (22 core + environment + restore), V5→V8 legacy-bill preservation, startup/DB-role probes and nine REA scenarios. Restore preserves count evidence/linked movements and deduplicates replay. Evidence `verification/.artifacts/counterline-verify-eeec190711d1/`, log `.local/counts-full-gate.log`; exact IDs in `FINDINGS.md`.
+- Browser expansion exposed exhaustion of the shared fixture owner's30-sign-ins/15-minute bucket. Disposable browser-specific owners and per-file session reuse fix the harness; production rate limits unchanged. Per-action REA deadlines and redacted failure diagnostics now preserve useful failure evidence.
+- Explicit host-offline backend packaging used; remote CI/default container compilation remain unclaimed. User development/staging stayed stopped with their V5 images, credentials and data unchanged. Custom schedules, valuation, purchase orders/supplier bills and payments remain separate work; final plan packaging is undecided.
 
 ## Inventory increment — 2026-10-18
 
@@ -49,4 +59,4 @@ Both development and staging Compose stacks, including their databases, were sto
 
 ## Next action
 
-Review the completed inventory branch and its API/business policies, then shape supplier/purchase ordering and receiving reconciliation before the expenses/shift-control increment. Keep explicit cancellation/reversal and multi-outlet policies rather than guessing physical stock returns. Resume/promote user environments only when requested. CI remains configured but unexecuted remotely; hosted SaaS/security/native gates remain required.
+Continue supplier setup → purchase ordering → partial delivery receiving into the verified ledger, then supplier bills/outstanding payments before expenses/shift control. Physical stock counts are complete for the bounded web/backend scope. Keep explicit cancellation/reversal and multi-outlet policies rather than guessing physical stock returns. Resume/promote user environments only when requested. CI remains configured but unexecuted remotely; hosted SaaS/security/native gates remain required.

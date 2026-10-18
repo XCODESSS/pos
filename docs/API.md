@@ -20,6 +20,8 @@ At the server root only: `GET /health` returns liveness/mode/environment; `GET /
 | POST | `/inventory/ingredients`, `/inventory/ingredients/{id}` | Ingredient setup / versioned metadata |
 | POST | `/inventory/ingredients/{id}/movements` | Retry-safe receiving, waste or signed adjustment |
 | GET | `/inventory/movements` | Ingredient-scoped immutable movement history |
+| GET / POST | `/inventory/counts` | Paged count history / atomic reviewed physical-count correction |
+| GET | `/inventory/counts/{id}` | Immutable count recovery by UUID |
 | GET / POST | `/inventory/recipes` | Current/historical recipe revision / guarded new revision |
 | POST | `/orders/stock-preview` | Cashier/manager stock warnings, no reservation or deduction |
 | GET | `/tables` | All floor/table records with current open check ID |
@@ -112,6 +114,16 @@ Preview body `{lines:[CartLine]}` uses normal menu/quantity validation and retur
 New standalone orders and check batches atomically commit recipe consumption, stock warning snapshot, bill and KOT. `Order.inventory` returns that immutable StockSnapshot; migrated older bills remain `inventory:null`, never retro-deducted. Recipe changes, later receipts, payment, table transfer, preparation and order retries do not recalculate or repeat deductions. Missing mappings warn and remain orderable during rollout; unknown ingredient use is not guessed. Kitchen-only projections still omit stock and financial details.
 
 **Warn, not block:** ordinary shortages succeed without manager approval, record full consumption and expose negative balances. Shortages do not bypass menu availability, permissions or persistence/numeric validation. A failed transaction rolls back order/KOT/stock together. Customer bill printing excludes internal stock warnings.
+
+## Physical stock counts
+
+Owner/manager only, using STOCK_READ/STOCK_MANAGE. POST `/inventory/counts` with `{id,reason,lines:[{ingredientId,expectedVersion,countedMilli}]}`. Count 1–100 unique ingredients; canonical UUIDs; reason 1–200 printable characters; physical quantities are nonnegative integer thousandths, at most 1,000,000,000,000. Fixed ingredient units apply. No client actor, variance or replacement recorded balance is accepted.
+
+Response `{id,sequence,reason,actorId,createdAt,lines:[{ingredientId,ingredientName,unit,observedVersion,recordedMilli,countedMilli,varianceMilli}]}` is immutable evidence. Nonzero differences create linked `COUNT` movements with `stockCountId`; all corrections/document/audit commit together under the stock transaction lock. Zero-variance observations persist but do not create movements or advance ingredient versions. Negative recorded stock can reconcile to a nonnegative physical quantity; the difference can span twice the stock limit.
+
+Any stale ingredient version returns 409 for the whole count; reload and review/recount, never silently rebase old quantities. Exact UUID/normalized-intent replay returns the original count before live-version checks, even after later activity. Changed intent under the same UUID returns 409. Line ordering does not change intent. Counts do not rewrite order/recipe snapshots, payments or sales.
+
+GET `/inventory/counts?limit=10&before=SEQUENCE` returns `{counts,nextCursor}`, newest first, default 25/max 100. GET `/inventory/counts/{id}` recovers a known count. The web retains unconfirmed commands in business-scoped session storage and supports explicit confirmation, unchanged retry and known-ID recovery. Drafts are not a stock reservation/freeze; coordinate physical counting with service. No schedules, approvals or valuation are implied.
 
 ## History, kitchen and reports
 

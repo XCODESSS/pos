@@ -22,15 +22,15 @@ Exit evidence:
 
 Production is not the exit claim. Hosted TLS/monitoring, privileged-role separation, fiscal policy, tenancy lifecycle, native/toolchain and hardware gates remain open. Current evidence and any unfinished acceptance conditions: `STATE.md`.
 
-## NOW — connected inventory/recipes review
+## NOW — inventory and physical stock counts verified
 
 Spec `INVENTORY.md` and plan `../superpowers/plans/2026-10-18-inventory-recipes.md` deliver fixed-unit ingredients, receiving/waste/adjustment history, versioned recipes, exactly-once stock consumption on accepted food submissions and warning-only shortages. The backend/web increment has18 passing public acceptance cases, stock/money restore, a retained V5→V7 preservation rehearsal and six complete REA scenarios. New inventory setup/workflow/narrow captures have30/39/8 completed steps. Current evidence and build/native limits: `STATE.md` / `FINDINGS.md`.
 
-This is on local `feat/inventory-recipes`, not automatically merged/promoted. User development/staging stay stopped. Full purchasing/supplier/payable, stock valuation/expiry and explicit reversal policies are still open; manual receiving does not erase those requirements.
+The follow-on physical-count increment (`STOCK-COUNTS.md`) is verified on `feat/stock-reconciliation`, based on inventory:24 acceptance cases, V5→V8 upgrade/restore and nine REA scenarios. Counts have immutable variance evidence, linked corrections, stale/race protection and browser recovery. These branches are not automatically merged/promoted. User development/staging stay stopped. Full purchasing/supplier/payable, stock valuation/expiry and explicit reversal policies are still open; manual receiving does not erase those requirements.
 
 ## NEXT — integrated online product and SaaS operating model
 
-1. **Purchasing and stock reconciliation:** extend the verified ingredient/recipe/receiving/waste increment with supplier/purchase-order/payable workflows and reconciliation. Shape valuation/lot/expiry and cancellation/reversal policies explicitly; do not silently restore ingredients for a financial refund.
+1. **Purchasing:** extend the verified ingredient/recipe/count/receiving/waste increment with suppliers, purchase orders, partial deliveries and payable workflows. Custom review schedules and final Base/Plus/Premium packaging remain deferred. Shape valuation/lot/expiry and cancellation/reversal policies explicitly; do not silently restore ingredients for a financial refund.
 2. **Business control:** expenses, cash shifts/closing, reconciliation and useful sales/item/stock reports. Separate cash receipts from sales recognition; define immutable refund/credit-note policies.
 3. **Customers and loyalty:** consent-aware records, benefits and points tied to real settlements with safe retries/reversal rules.
 4. **SaaS lifecycle and outlets:** approved tenant provisioning/offboarding, subscription/access policy, configuration/backup/migration fleet operations and multi-outlet memberships/permissions. Current database isolation is not onboarding automation. Decide pilot scale and capacity before increasing the bounded tenant registry.

@@ -22,12 +22,12 @@ Owner/manager loads ingredient balances → selects ingredients and enters nonne
 
 ## Implementation and verification checklist
 
-- [ ] HTTP red → green: record a 500 g → 450 g count, immutable evidence and −50 g linked movement; zero variance records without a movement.
-- [ ] HTTP red → green: concurrent replay, changed intent, stale multi-line atomic rejection, live submission/count races, quantity bounds and role/tenant isolation.
-- [ ] Connect a focused `StockCountsView.tsx` to inventory; retain exact pending commands in business-scoped session storage, show review/confirmation and count history, require explicit reload after stale stock.
-- [ ] Extend real backup/restore assertions with saved count evidence, linked movements and deduplicated replay after restore. Preserve the existing negative-stock fixture and upgrade drill.
-- [ ] REA desktop + 390px count entry/review/confirmation/history; inspect screenshots. Run full HTTP/tenant/restore/upgrade/browser gate using explicit host-offline backend build if TLS restrictions persist.
-- [ ] Update API/product/state evidence; make small verified commits. No merge, push, environment promotion or development/staging restart.
+- [x] HTTP red → green: record a 500 g → 450 g count, immutable evidence and −50 g linked movement; zero variance records without a movement.
+- [x] HTTP regression coverage: concurrent replay, changed intent, stale multi-line atomic rejection, live submission/count races, quantity bounds and role/tenant isolation.
+- [x] Connect a focused `StockCountsView.tsx` to inventory; retain exact pending commands in business-scoped session storage, show review/confirmation and count history, require explicit reload after stale stock.
+- [x] Extend real backup/restore assertions with saved count evidence, linked movements and deduplicated replay after restore. Preserve the existing negative-stock fixture and upgrade drill.
+- [x] REA desktop + 390px count entry/review/confirmation/history; inspect screenshots. Run full HTTP/tenant/restore/upgrade/browser gate using explicit host-offline backend build if TLS restrictions persist.
+- [x] Update API/product/state evidence; make small verified commits. No merge, push, environment promotion or development/staging restart.
 
 ## Files and responsibilities
 
