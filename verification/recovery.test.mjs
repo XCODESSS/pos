@@ -16,4 +16,13 @@ test('restored tenant retains settled bill snapshots, split payments and sales e
   assert.deepEqual(check.data.payments.map(value => value.amountPaise), [7000, 8698]);
   const report = await api('/reports/today', undefined, accessToken);
   assert.deepEqual(report.data, expected.report);
+  assert.deepEqual(order.data.inventory, expected.inventory.snapshot);
+  const ingredients = await api('/inventory', undefined, accessToken);
+  const ingredient = ingredients.data.ingredients.find(value => value.id === expected.inventory.ingredientId);
+  assert.deepEqual(ingredient, expected.inventory.ingredient); assert.equal(ingredient.balanceMilli, -50000);
+  const history = await api(`/inventory/movements?ingredientId=${ingredient.id}`, undefined, accessToken);
+  assert.deepEqual(history.data, expected.inventory.history);
+  assert.equal(history.data.movements.filter(value => value.kind === 'CONSUMPTION').length, 2);
+  const recipe = await api(`/inventory/recipes?itemId=${expected.inventory.itemId}&kind=BASE&version=1`, undefined, accessToken);
+  assert.deepEqual(recipe.data, expected.inventory.recipe); assert.equal(recipe.data.components[0].quantityMilli, 75000);
 });

@@ -10,9 +10,10 @@ const composeEnvironment = fileURLToPath(new URL('./compose.env', import.meta.ur
 const project = `counterline-verify-${randomBytes(6).toString('hex')}`;
 const secret = () => randomBytes(24).toString('hex');
 const environment = {
-  ...process.env, VERIFY_PROJECT: project, VERIFY_DB_PASSWORD: secret(),
+  ...process.env, VERIFY_PROJECT: project, VERIFY_BACKEND_IMAGE: `${project}-backend`, VERIFY_DB_PASSWORD: secret(),
   VERIFY_OWNER_USERNAME: 'verify-owner', VERIFY_OWNER_PASSWORD: secret(),
   COUNTERLINE_VERIFICATION: 'isolated', VERIFY_TENANT_PATH: '/t/alpha',
+  VERIFY_APP_ENV: 'verification', VERIFY_BACKEND_DOCKERFILE: 'Dockerfile',
   VERIFY_ALPHA_DB_PASSWORD: secret(), VERIFY_BETA_DB_PASSWORD: secret(),
 };
 environment.VERIFY_TENANTS_JSON = JSON.stringify(['alpha', 'beta'].map((slug, index) => ({
@@ -69,7 +70,13 @@ try {
   created = true;
   await compose(['build'], { quiet: true });
   if (interrupted) throw new Error('Verification interrupted.');
-  await compose(['up', '-d', '--wait', '--wait-timeout', '120'], { quiet: true });
+  const upgradeFrom = process.argv.find(value => value.startsWith('--upgrade-from='))?.slice('--upgrade-from='.length);
+  if (upgradeFrom) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._/:@-]+$/.test(upgradeFrom)) throw new Error('Invalid retained upgrade image reference.');
+    await run('docker', ['image', 'inspect', upgradeFrom], { quiet: true });
+    environment.VERIFY_BACKEND_IMAGE = upgradeFrom;
+  }
+  await compose(['up', '-d', '--no-build', '--wait', '--wait-timeout', '120'], { quiet: true });
   const port = await compose(['port', 'web', '80'], { quiet: true });
   const address = port.output.trim();
   if (!/^127\.0\.0\.1:\d+$/.test(address)) throw new Error('Unexpected verification port mapping.');
@@ -78,6 +85,14 @@ try {
   const files = (await readdir(new URL('./', import.meta.url))).filter(name => name.endsWith('.test.mjs')).sort((a, b) => a === 'environment.test.mjs' ? -1 : b === 'environment.test.mjs' ? 1 : a.localeCompare(b));
   if (!files.length) throw new Error('No acceptance cases found.');
   if (files.includes('environment.test.mjs')) await run(process.execPath, ['--test', 'verification/environment.test.mjs']);
+  if (upgradeFrom) {
+    await run(process.execPath, ['verification/upgrade.mjs', 'before']);
+    environment.VERIFY_BACKEND_IMAGE = `${project}-backend`;
+    await compose(['up', '-d', '--no-build', '--no-deps', '--force-recreate', '--wait', '--wait-timeout', '120', 'backend'], { quiet: true });
+    await compose(['exec', '-T', 'web', 'nginx', '-s', 'reload'], { quiet: true });
+    await waitReady(environment.VERIFY_BASE_URL);
+    await run(process.execPath, ['verification/upgrade.mjs', 'after']);
+  }
   await run(process.execPath, ['--test', '--test-concurrency=1', ...files.filter(name => !['environment.test.mjs', 'recovery.test.mjs'].includes(name)).map(name => `verification/${name}`)]);
   // Misconfiguration probes use disposable one-off containers, not the running service.
   const registry = environment.VERIFY_TENANTS_JSON;
@@ -105,7 +120,7 @@ try {
     }
     const output = new URL(`./.artifacts/${project}/`, import.meta.url);
     await mkdir(output, { recursive: true });
-    await writeFile(new URL('release.json', output), JSON.stringify({ revision, project, backendBuild: process.argv.includes('--host-backend') ? 'host-offline' : 'container', images }, null, 2));
+    await writeFile(new URL('release.json', output), JSON.stringify({ revision, project, backendBuild: process.argv.includes('--host-backend') ? 'host-offline' : 'container', upgradeFrom: upgradeFrom ?? null, images }, null, 2));
     console.log(`Promoted the tested images locally as counterline-backend:${releaseTag} and counterline-web:${releaseTag}. No push.`);
   }
 } catch (cause) {

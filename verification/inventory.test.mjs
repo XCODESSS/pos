@@ -161,3 +161,15 @@ test('ingredients, recipes and stock ledgers remain isolated between independent
   assert.equal((await api('/inventory/ingredients', { id: item.id, name: 'Beta independent ingredient', unit: 'ML', lowStockMilli: 0 }, beta, '/t/beta')).status, 200);
   assert.equal((await balance(alpha, item.id)).unit, 'G'); assert.equal((await balance(beta, item.id, '/t/beta')).unit, 'ML');
 });
+
+test('numeric-range failure rolls back the entire submission instead of inventing stock or a partial bill', async () => {
+  const { accessToken: token } = await login(); const item = await ingredient(token); const food = await dish(token);
+  assert.equal((await move(token, item, -1000000000000, 'ADJUSTMENT', { reason: 'Numeric boundary fixture' })).status, 200);
+  await api('/inventory/recipes', { itemId: food.id, kind: 'BASE', expectedVersion: 0, components: [{ ingredientId: item.id, quantityMilli: 1000 }] }, token);
+  const id = uuid();
+  const rejected = await api('/orders', { id, lines: [{ itemId: food.id, quantity: 1 }] }, token);
+  assert.equal(rejected.status, 400); assert.match(rejected.data.message, /numeric range/);
+  assert.equal((await api(`/orders/${id}`, undefined, token)).status, 404);
+  assert.equal((await balance(token, item.id)).balanceMilli, -1000000000000);
+  assert.equal((await api(`/inventory/movements?ingredientId=${item.id}`, undefined, token)).data.movements.length, 1);
+});

@@ -16,7 +16,7 @@ services:
       timeout: 3s
       retries: 30
   backend:
-    image: ${VERIFY_PROJECT:?runner project required}-backend
+    image: ${VERIFY_BACKEND_IMAGE:?runner backend image required}
     build:
       context: ../backend
       dockerfile: ${VERIFY_BACKEND_DOCKERFILE:-Dockerfile}

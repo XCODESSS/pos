@@ -83,3 +83,34 @@ const switching = { ...desktop, start_url: { url: `${process.env.VERIFY_BASE_URL
 };
 const betaResult = await capture('tenant-switch', switching);
 assert.ok(!betaResult.steps.at(-1).artifacts.accessibility.value.text.includes(check.number), 'alpha recovery state is not displayed in beta');
+
+const cashierPassword = uuid();
+process.env.VERIFY_INVENTORY_CASHIER_PASSWORD = cashierPassword;
+const createdCashier = await api('/admin/staff', { id: uuid(), username: 'inventory-browser-cashier', displayName: 'Inventory cashier', role: 'CASHIER', password: cashierPassword }, token);
+assert.equal(createdCashier.status, 200);
+const inventorySetup = fill(JSON.parse(await readFile(new URL('./rea-inventory-setup.json', import.meta.url), 'utf8')));
+await capture('inventory-setup', inventorySetup);
+const ingredient = (await api('/inventory', undefined, token)).data.ingredients.find(value => value.name === 'Browser paneer');
+const inventoryDish = (await api('/admin/menu', undefined, token)).data.find(value => value.name === 'Inventory thali');
+assert.ok(ingredient && inventoryDish); assert.equal(ingredient.balanceMilli, 100000);
+substitutions.INGREDIENT_ID = ingredient.id; substitutions.INVENTORY_DISH = inventoryDish.id;
+const inventoryScenario = fill(JSON.parse(await readFile(new URL('./rea-inventory.json', import.meta.url), 'utf8')));
+const inventoryResult = await capture('inventory-workflow', inventoryScenario);
+assert.ok(!inventoryResult.steps.find(step => step.step_id === 'shortage-preview').artifacts.accessibility.value.text.includes('Inventory & recipes'), 'cashier has no stock administration navigation');
+const finalIngredient = (await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id);
+assert.equal(finalIngredient.balanceMilli, -50000); assert.equal(finalIngredient.lowStock, true);
+const movements = (await api(`/inventory/movements?ingredientId=${ingredient.id}`, undefined, token)).data.movements;
+assert.deepEqual(movements.map(value => value.deltaMilli), [-150000, 5000, -5000, 100000]);
+const stockOrder = (await api('/orders?limit=100', undefined, token)).data.orders.find(value => value.bill.lines.some(line => line.itemId === inventoryDish.id));
+assert.equal(stockOrder.status, 'PAID'); assert.equal(stockOrder.bill.totalPaise, 25200);
+assert.equal(stockOrder.createdBy, createdCashier.data.id); assert.equal(stockOrder.paidBy, createdCashier.data.id);
+assert.equal(movements.find(value => value.kind === 'CONSUMPTION').actorId, createdCashier.data.id);
+assert.equal(stockOrder.inventory.warnings[0].shortageMilli, 50000); assert.equal(stockOrder.inventory.recipes[0].version, 2);
+await capture('inventory-narrow', { ...inventoryScenario,
+  environment: { ...inventoryScenario.environment, viewport: { width: 390, height: 844, device_scale_factor: 1 } },
+  actions: [...inventoryScenario.actions.slice(0, 4),
+    { step_id: 'manage-paneer', action: 'click', locator: { kind: 'role', role: 'button', name: 'Manage ingredient Browser paneer' } },
+    { step_id: 'negative-visible', action: 'wait_for', locator: { kind: 'css', selector: '.stock-negative-label:has-text("-50 g")' }, state: 'visible', timeout_ms: 20000 },
+    { step_id: 'negative-summary', action: 'click', locator: { kind: 'css', selector: '.stock-negative-label' } },
+  ],
+});

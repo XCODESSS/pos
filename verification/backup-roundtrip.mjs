@@ -35,6 +35,11 @@ async function transfer(args, path, direction) {
 const directory = await mkdtemp(join(tmpdir(), 'counterline-restore-'));
 try {
   const { accessToken: token } = await login(); const item = await dish(token, { name: 'Restore fixture', pricePaise: 14950 });
+  const ingredientId = uuid();
+  assert.equal((await api('/inventory/ingredients', { id: ingredientId, name: 'Restore tracked ingredient', unit: 'G', lowStockMilli: 10000 }, token)).status, 200);
+  assert.equal((await api(`/inventory/ingredients/${ingredientId}/movements`, { id: uuid(), kind: 'RECEIPT', quantityMilli: 100000, reason: 'Restore delivery', expectedVersion: 0 }, token)).status, 200);
+  const recipe = { itemId: item.id, kind: 'BASE', expectedVersion: 0, components: [{ ingredientId, quantityMilli: 75000 }] };
+  assert.equal((await api('/inventory/recipes', recipe, token)).status, 200);
   const orderId = uuid();
   const order = await api('/orders', { id: orderId, lines: [{ itemId: item.id, quantity: 1 }] }, token);
   assert.equal(order.data.bill.totalPaise, 15698);
@@ -45,7 +50,14 @@ try {
   assert.equal((await api(`/checks/${checkId}/batches`, { id: uuid(), expectedVersion: 0, lines: [{ itemId: item.id, quantity: 1 }] }, token)).status, 200);
   assert.equal((await api(`/checks/${checkId}/cash-payments`, { id: uuid(), expectedVersion: 1, amountPaise: 7000 }, token)).status, 200);
   assert.equal((await api(`/checks/${checkId}/cash-payments`, { id: uuid(), expectedVersion: 2, amountPaise: 8698 }, token)).status, 200);
-  const expected = { orderId, checkId, bill: order.data.bill, report: (await api('/reports/today', undefined, token)).data };
+  assert.equal((await api('/inventory/recipes', { ...recipe, expectedVersion: 1, components: [{ ingredientId, quantityMilli: 50000 }] }, token)).status, 200);
+  const expected = { orderId, checkId, bill: order.data.bill, report: (await api('/reports/today', undefined, token)).data,
+    inventory: { ingredientId, itemId: item.id, snapshot: order.data.inventory,
+      ingredient: (await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredientId),
+      history: (await api(`/inventory/movements?ingredientId=${ingredientId}`, undefined, token)).data,
+      recipe: (await api(`/inventory/recipes?itemId=${item.id}&kind=BASE&version=1`, undefined, token)).data,
+    },
+  };
   const record = join(directory, 'expected.json');
   await writeFile(record, JSON.stringify(expected), { mode: 0o600 });
   const dump = join(directory, 'tenant.dump');
@@ -63,7 +75,7 @@ try {
   await waitReady(environment.VERIFY_BASE_URL);
   assert.equal((await api('/auth/me', undefined, token)).status, 200, 'persisted session still resolves after restoring into a different database');
   await promisify(execFile)(process.execPath, ['--test', 'verification/recovery.test.mjs'], { env: { ...environment, VERIFY_RECOVERY_RECORD: record }, timeout: 60_000, maxBuffer: 1024 * 1024 }).then(result => process.stdout.write(result.stdout));
-  console.log('Recovery drill passed: fresh scratch database, original receipt, two cash splits, persisted session and unchanged sales.');
+  console.log('Recovery drill passed: fresh scratch database, original receipt, cash splits, negative stock/ledger, recipe versions, submission snapshot, persisted session and unchanged sales.');
 } finally {
   await rm(directory, { recursive: true, force: true });
 }
