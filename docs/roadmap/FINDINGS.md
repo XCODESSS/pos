@@ -1,5 +1,24 @@
 # Findings
 
+## 2026-10-20 — Supplier bills, partial payments and outstanding balances
+
+Continued `63cd2cd` on `feat/supplier-payables`. Scope/policies in `PAYABLES.md`. HTTP create/payment/void/summary slices each failed404 before implementing the respective route. A final-payment-slot regression failed200-vs400 before preventing the100th partial record from stranding a balance. V10 is additive; V1–V9 unchanged.
+
+Known amounts: INR100 bill →40 recorded payment →60 final leaves zero outstanding and two immutable payments. Concurrent identical requests deduplicate; changed intent, duplicate supplier references, stale versions, overpayments, invalid dates/amounts and mismatched supplier/order links reject without partial mutation. Voids retain unpaid evidence/reference; part-paid/paid voids reject. Due-today balances are not overdue. Summary includes all bills regardless of history pagination. Owner/manager permissions and independent alpha/beta IDs/payment histories are exercised.
+
+Final command `node verification/run.mjs --host-backend --upgrade-from=counterline-backend:9cb1e27 --browser` with installed REA6.5.0/Chrome paths passed38 acceptance cases (36 core + fresh environment + restore), legacy V5→V10 preservation, identity/DB-role probes and17 REA scenarios. Host web production build passed; explicit host Gradle offline distribution packaged/tested in Docker. No default-container/remote CI/native claim. Restore preserved partial supplier payment, optional purchase link, void, balances and exact create/payment/void replay alongside all prior facts.
+
+REA observed INR1,000 supplier invoice linked to an existing quantity order,400 partial payment and600 final after stale-command rejection/reload; a separate unpaid bill was voided. Narrow retained-command recovery did not duplicate the payment and cleared the journal. Beta ignored alpha's selected bill/pending payment. Public before/after stock and customer sales were identical. Reviewed desktop/390px screenshots; not real phones or Safari. Initial browser attempt exposed an unsupported `locator.exact` REA argument, not an application failure; replacing it with a scoped CSS form-button locator passed the subsequent full runs.
+
+Final artifacts `verification/.artifacts/counterline-verify-443cce7f9520/`; log `.local/payables-final-gate.log`. New scenario counts include initial state:
+- Payables24: `ev_3fa6938b80eb231174e6f32046fdb14fae98983663527fde3f0e7e29e69106cd`.
+- Narrow recovery11: `ev_700b5ed63720e53d5e6461cd7dc7f3d42cdaf1f08c115839b856b14fe1fec232`.
+- Stale recovery/final payment15: `ev_ebf2871717bff75c3d26d4d63f098217524b0b18ce7f1af7e59d503190222672`.
+- Unpaid void11: `ev_762f4af4c6d4814e9d66a9a4293d3f89ba16930741c09db0aec961896b630edc`.
+- Tenant switch6: `ev_ee665ef4ecbbca78a7bdcdfda8735b33bcbcf5a254154ed373a70368cc959d87`.
+
+Docker Desktop was started for the disposable checks, not the user application stacks. Development/staging images, volumes and credentials remained stopped/unchanged; all runner-owned resources cleaned up. No live transfers, promotion or push. Credits/refunds/payment correction/reversal, advances, fiscal accounting and cash-shift posting remain unsupported. Next: expenses and cash-shift reconciliation with explicit outflow attribution, not silently treating these records as processed cash.
+
 ## 2026-10-18 — Supplier quantity purchasing and partial deliveries
 
 User asked to continue to the next workflow after physical counts. Started `feat/supplier-purchasing` from count checkpoint `86ab211`. Spec `PURCHASING.md`; backend commit `a690214`. The initial supplier/order/delivery test failed404 before implementation; the close-remainder test failed404 before adding its route/rules. Additive V9 preserves all earlier migration files.

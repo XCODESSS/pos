@@ -1,13 +1,23 @@
 # Project state
 
-Updated: 2026-10-18
+Updated: 2026-10-20
 Target: integrated staff-facing multi-tenant SaaS for India/INR, web + Kotlin Android + SwiftUI iOS/iPadOS
-Current milestone: physical counts and supplier quantity purchasing verified; supplier bills/payments next
-Status: backend/web inventory/counts/purchasing, upgrade/restore and browser flows pass in disposable environments; native/toolchain and production/SaaS lifecycle gates remain open
+Current milestone: supplier bills/recorded payments verified; expenses and cash-shift control next
+Status: backend/web inventory/counts/purchasing/payables, upgrade/restore and browser flows pass in disposable environments; native/toolchain and production/SaaS lifecycle gates remain open
 
 ## Scope and architecture
 
 Independent restaurant businesses are separate tenants. The current shared backend uses explicitly registered database-per-tenant runtimes; each tenant currently has one outlet. No public signup, subscription control plane or multi-outlet memberships exist. Architecture trade-off: D-008. Full contract: `../../PRODUCT.md`. Foundation spec: `FOUNDATION.md`; execution plan: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
+
+## Supplier bills and recorded payments — 2026-10-20
+
+- Continued from purchasing checkpoint `63cd2cd` on `feat/supplier-payables`. Spec/policies: `PAYABLES.md`; API: `../API.md`. No merge/promotion/push.
+- Additive V10 records supplier bills with independently entered integer-paise totals, optional same-supplier purchase links, strict India dates and supplier-scoped normalized reference uniqueness (including void bills). Bills/payments never receive stock or alter customer sales.
+- Partial/final payments record already-made CASH/BANK_TRANSFER/UPI/OTHER payments with immutable evidence and actor/time. Exact replay deduplicates before version checks; competing payments/voids have one winner. Only unpaid bills can be voided; no deletion, credits, refunds or payment reversals are claimed. Aggregate outstanding/overdue values are decimal strings; due today is not overdue. Bounded100-payment preview requires the last record to settle; never overstate money actually paid.
+- Explicit PAYABLES_READ/PAYABLES_MANAGE for owner/manager; cashier/kitchen denied. Dedicated web workspace has reviewed commands, bill ID recovery, business-scoped pending journals, explicit stale reload, balance overview/history and responsive details. Native parity remains unimplemented/unverified.
+- Final gate:38 acceptance cases (36 core + fresh environment + restore), V5→V10 legacy receipt preservation, startup identity/DB-role probes, and17 REA scenarios. Browser recorded INR1,000 bill →400 partial →600 final, recovered the first payment without duplication, rejected a stale draft and voided a separate unpaid bill. Cross-business journal recovery stayed isolated. Stock/customer sales unchanged. Desktop/390px screenshots reviewed; no device/Safari claim.
+- Restore preserves bill/order link, partial payment, unpaid void, aggregate balances and exact create/payment/void replay alongside prior stock/customer-money/session evidence. Artifacts `verification/.artifacts/counterline-verify-443cce7f9520/`; log `.local/payables-final-gate.log`; evidence IDs in `FINDINGS.md`.
+- Host TypeScript production build and explicit offline-host JDK packaging passed. Default container dependency compilation and remote CI remain unclaimed. Docker Desktop was started for disposable verification only; development/staging remained stopped and unchanged. Runner-owned resources were cleaned up.
 
 ## Supplier quantity purchasing — 2026-10-18
 
@@ -62,11 +72,11 @@ Both development and staging Compose stacks, including their databases, were sto
 
 ## Remaining product / release gates
 
-- Complete supplier bills/payments, procurement pricing/supplier lifecycle/returns and stock valuation/expiry/reversal policies; expenses/shifts/reconciliation; customer consent/loyalty; offline durable outbox, registered devices and synchronization. Existing recipes/manual receiving/waste are the current connected increment, not the complete purchasing product.
+- Complete supplier credits/payment corrections/reversals/advances, procurement pricing/supplier lifecycle/returns and stock valuation/expiry/reversal policies; expenses/shifts/reconciliation; customer consent/loyalty; offline durable outbox, registered devices and synchronization. Existing recipes/manual receiving/waste are the current connected increment, not the complete purchasing product.
 - SaaS tenant lifecycle/subscriptions, large-fleet provisioning/migration/pooling, multi-outlet authorization and hosted deployment.
 - Separate runtime/migrator DB privileges, TLS/ingress/proxy trust, secret rotation, MFA/recovery/idle policy, production monitoring, encrypted/off-host retention and measured recovery objectives, accounting/fiscal rules, security/load/accessibility and hardware validation.
 - Complete native menu choices/check/admin/history/KDS workflows and real builds/devices. Android SDK and Mac/Xcode/signing remain unresolved. Native default tenant URL sources changed, but neither client is claimed built or device-tested.
 
 ## Next action
 
-Next connected increment: supplier bills → partial payment recording → outstanding/overdue balances, linked to suppliers/orders without receiving stock again. Define duplicate bill references, dates, credits/voids and payment attribution before implementation; do not infer payable money from quantity-only orders or claim payment processing. Then expenses/shift control. Physical counts and quantity procurement are complete for their bounded web/backend scopes. Keep explicit cancellation/reversal and multi-outlet policies rather than guessing physical stock returns. Resume/promote user environments only when requested. CI remains configured but unexecuted remotely; hosted SaaS/security/native gates remain required.
+Next connected increment: expenses → cash shifts/closing → reconciliation. Define opening float, expense versus supplier-payment attribution, counted/expected cash, discrepancy reasons and immutable correction rules before implementation. Existing recorded supplier payments do NOT post to a cash shift; prevent double-counting cash outflows when connecting them. Supplier bills/payments are complete for the bounded web/backend scope in PAYABLES.md, not full payable accounting. Credits/payment reversal and physical goods-return policies remain explicit later work. Resume/promote user environments only when requested. CI remains configured but unexecuted remotely; hosted SaaS/security/native gates remain required.
