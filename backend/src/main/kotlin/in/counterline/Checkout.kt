@@ -12,7 +12,7 @@ import java.util.UUID
 import javax.sql.DataSource
 
 /** Owns orders: server pricing, bill snapshots, cash settlement and kitchen progress. */
-class Checkout(private val dataSource: DataSource, private val json: Json, private val inventory: Inventory) {
+class Checkout(private val dataSource: DataSource, private val json: Json, private val inventory: Inventory, private val cash: CashControl) {
     private val orderSelect = """
         SELECT o.*, k.status AS kitchen_status, k.version AS kitchen_version,
                k.updated_at AS kitchen_updated_at,
@@ -108,15 +108,16 @@ class Checkout(private val dataSource: DataSource, private val json: Json, priva
             ?: throw Problem(404, "not_found", "Order not found.")
         if (order.checkId != null) throw Problem(409, "check_settlement_required", "Settle this kitchen batch through its running check, not as a separate bill.")
         if (order.status == "PAID") {
-            if (payment.receivedPaise != order.cashReceivedPaise)
-                throw Problem(409, "already_paid", "Cash payment already recorded with a different amount.")
+            if (payment.receivedPaise != order.cashReceivedPaise || payment.cashShiftId != order.cashShiftId)
+                throw Problem(409, "already_paid", "Cash payment already recorded with a different amount or drawer.")
             return@databaseTransaction order
         }
         checkInput(payment.receivedPaise in order.bill.totalPaise..1_000_000_000L,
             "Cash received must cover the bill and not exceed INR 1 crore.")
-        connection.prepareStatement("UPDATE orders SET paid_at = ?, cash_received_paise = ?, paid_by = ? WHERE id = ?").use {
+        cash.post(connection, payment.cashShiftId, CashKind.SALE, uuid.toString(), order.bill.totalPaise, actor)
+        connection.prepareStatement("UPDATE orders SET paid_at = ?, cash_received_paise = ?, paid_by = ?, cash_shift_id = ? WHERE id = ?").use {
             it.setObject(1, Instant.now().atOffset(java.time.ZoneOffset.UTC))
-            it.setLong(2, payment.receivedPaise); it.setObject(3, UUID.fromString(actor)); it.setObject(4, uuid); it.executeUpdate()
+            it.setLong(2, payment.receivedPaise); it.setObject(3, UUID.fromString(actor)); it.setObject(4, stockId(payment.cashShiftId!!)); it.setObject(5, uuid); it.executeUpdate()
         }
         audit(connection, actor, "CASH_RECORDED", id)
         find(connection, uuid) ?: error("Settled order missing")
@@ -219,7 +220,7 @@ class Checkout(private val dataSource: DataSource, private val json: Json, priva
         }
         return Order(json.decodeFromString<Bill>(rows.getString("bill")),
             if (paidAt == null) "OPEN" else "PAID", paidAt, received, kitchen,
-            rows.getObject("created_by")?.toString(), rows.getObject("paid_by")?.toString(), rows.getObject("check_id")?.toString(), rows.getString("current_table_label"), rows.getString("stock_snapshot")?.let { json.decodeFromString<StockSnapshot>(it) })
+            rows.getObject("created_by")?.toString(), rows.getObject("paid_by")?.toString(), rows.getObject("check_id")?.toString(), rows.getString("current_table_label"), rows.getString("stock_snapshot")?.let { json.decodeFromString<StockSnapshot>(it) }, rows.getObject("cash_shift_id")?.toString())
     }
 
     private fun parseId(id: String): UUID = try { UUID.fromString(id) } catch (_: IllegalArgumentException) {

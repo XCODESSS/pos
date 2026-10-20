@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { api, login, uuid } from './http.mjs';
+import { cashApi as api, login, uuid } from './http.mjs';
 
 test('two businesses isolate sessions, identical identities, orders, checks and money', async () => {
   const alpha = '/t/alpha'; const beta = '/t/beta';

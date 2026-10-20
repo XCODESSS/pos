@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { api, dish, login, uuid } from './http.mjs';
+import { cashApi as api, dish, login, uuid } from './http.mjs';
 
 test('server prices two INR 140 dishes with independently rounded split GST', async () => {
   const owner = await login(); const item = await dish(owner.accessToken);

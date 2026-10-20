@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { api, dish, login, uuid } from './http.mjs';
+import { cashApi as api, dish, login, uuid } from './http.mjs';
 
 async function table(token, label) {
   const result = await api('/admin/tables', { id: uuid(), table: { label, floor: uuid(), seats: 4, active: true } }, token);

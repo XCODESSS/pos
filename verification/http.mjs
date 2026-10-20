@@ -26,4 +26,13 @@ export async function dish(token, overrides = {}, id = `dish-${randomUUID()}`) {
   assert.equal(response.status, 200, 'fixture dish creation succeeds');
   return response.data;
 }
+// Existing checkout regression fixtures explicitly select the currently open test drawer.
+// Cash-control boundary tests use raw api(), including deliberately missing/stale shift IDs.
+export async function cashApi(path, body, token, tenantPath) {
+  if (body && /\/cash-payments?$/.test(path) && body.cashShiftId === undefined) {
+    const current = await api('/cash/active', undefined, token, tenantPath);
+    if (current.status === 200 && current.data.shift) body = { ...body, cashShiftId: current.data.shift.id };
+  }
+  return api(path, body, token, tenantPath);
+}
 export const uuid = randomUUID;

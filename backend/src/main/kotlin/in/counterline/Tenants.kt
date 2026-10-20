@@ -14,14 +14,16 @@ class TenantConfig(
     val ownerUsername: String? = null, val ownerPassword: String? = null,
 )
 class TenantRuntime(val id: String, val slug: String, val source: HikariDataSource, json: Json) {
+    val cash = CashControl(source, json)
     val inventory = Inventory(source, json)
     val stockCounts = StockCounts(source, json, inventory)
     val purchasing = Purchasing(source, json, inventory)
-    val payables = Payables(source, json)
-    val checkout = Checkout(source, json, inventory)
+    val payables = Payables(source, json, cash)
+    val expenses = Expenses(source, json, cash)
+    val checkout = Checkout(source, json, inventory, cash)
     val identity = Identity(source)
     val catalog = Catalog(source, json)
-    val frontDesk = FrontDesk(source, json, checkout)
+    val frontDesk = FrontDesk(source, json, checkout, cash)
 }
 
 /** Each runtime owns its pool/modules. Path selection never changes an existing runtime's database. */

@@ -213,6 +213,42 @@ fun main() {
                         call.require(Permission.PAYABLES_MANAGE); val input = call.receive<SupplierBillVoid>()
                         call.respond(withContext(Dispatchers.IO) { call.tenant().payables.void(call.parameters["id"]!!, input, call.principal().staff.id) })
                     }
+                    get("/expenses") {
+                        call.require(Permission.CASH_CONTROL); val before = call.queryLong("before"); val limit = call.queryLimit(20)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().expenses.list(before, limit) })
+                    }
+                    post("/expenses") {
+                        call.require(Permission.CASH_CONTROL); val input = call.receive<ExpenseInput>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().expenses.record(input, call.principal().staff.id) })
+                    }
+                    get("/expenses/{id}") {
+                        call.require(Permission.CASH_CONTROL)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().expenses.get(call.parameters["id"]!!) })
+                    }
+                    get("/cash/shifts") {
+                        call.require(Permission.CASH_CONTROL); val before = call.queryLong("before"); val limit = call.queryLimit(20)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().cash.list(before, limit) })
+                    }
+                    get("/cash/active") {
+                        call.require(Permission.CASH_SHIFT_ACTIVE)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().cash.active() })
+                    }
+                    post("/cash/shifts") {
+                        call.require(Permission.CASH_CONTROL); val input = call.receive<CashOpen>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().cash.open(input, call.principal().staff.id) })
+                    }
+                    get("/cash/shifts/{id}") {
+                        call.require(Permission.CASH_CONTROL)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().cash.get(call.parameters["id"]!!) })
+                    }
+                    get("/cash/shifts/{id}/movements") {
+                        call.require(Permission.CASH_CONTROL); val before = call.queryLong("before"); val limit = call.queryLimit(25)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().cash.movements(call.parameters["id"]!!, before, limit) })
+                    }
+                    post("/cash/shifts/{id}/close") {
+                        call.require(Permission.CASH_CONTROL); val input = call.receive<CashClose>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().cash.close(call.parameters["id"]!!, input, call.principal().staff.id) })
+                    }
                     get("/tables") {
                         call.require(Permission.ORDERS_READ)
                         call.respond(withContext(Dispatchers.IO) { call.tenant().frontDesk.tables() })

@@ -9,10 +9,12 @@ import kotlinx.serialization.Serializable
     val paidPaise: Long, val outstandingPaise: Long, val overdue: Boolean, val status: String, val version: Long,
     val actorId: String, val createdAt: String, val voidReason: String?, val voidedBy: String?, val voidedAt: String?)
 @Serializable enum class SupplierPaymentMethod { CASH, BANK_TRANSFER, UPI, OTHER }
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable data class SupplierPaymentInput(val id: String, val expectedVersion: Long, val amountPaise: Long,
-    val paymentDate: String, val method: SupplierPaymentMethod, val reference: String)
+    val paymentDate: String, val method: SupplierPaymentMethod, val reference: String,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER) val cashShiftId: String? = null)
 @Serializable data class SupplierPayment(val id: String, val sequence: String, val billId: String, val amountPaise: Long,
-    val paymentDate: String, val method: SupplierPaymentMethod, val reference: String, val actorId: String, val createdAt: String)
+    val paymentDate: String, val method: SupplierPaymentMethod, val reference: String, val actorId: String, val createdAt: String, val cashShiftId: String? = null)
 @Serializable data class SupplierBillPage(val bills: List<SupplierBill>, val nextCursor: String?)
 // Aggregate monetary values/counts are decimal strings: an unbounded history can exceed JS safe integers.
 @Serializable data class SupplierBalance(val supplierId: String, val supplierName: String, val outstandingPaise: String, val overduePaise: String, val openBills: String)

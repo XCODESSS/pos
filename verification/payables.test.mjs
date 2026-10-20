@@ -56,7 +56,7 @@ test('voiding only unpaid bills retains the reference and evidence without creat
   assert.deepEqual((await api(`/payables/bills/${body.id}/void`, command, token)).data, result.data);
   assert.equal((await api(`/payables/bills/${body.id}/void`, { ...command, reason: 'Changed' }, token)).status, 409);
   assert.equal((await api('/payables/bills', { ...body, id: uuid() }, token)).status, 409);
-  const payment = { id: uuid(), expectedVersion: 1, amountPaise: 100, paymentDate: '2026-01-02', method: 'CASH', reference: 'Cash handed over' };
+  const payment = { id: uuid(), expectedVersion: 1, amountPaise: 100, paymentDate: '2026-01-02', method: 'OTHER', reference: 'External payment receipt' };
   assert.equal((await api(`/payables/bills/${body.id}/payments`, payment, token)).status, 409);
   const other = await billFixture(token); assert.equal((await api('/payables/bills', other, token)).status, 200);
   assert.equal((await api(`/payables/bills/${other.id}/payments`, { ...payment, expectedVersion: 0 }, token)).status, 200);
@@ -119,7 +119,7 @@ test('bill and payment validation is atomic and purchase links must match the su
   const other = await billFixture(token);
   assert.equal((await api('/payables/bills', { ...other, purchaseOrderId: orderId }, token)).status, 400);
   const linked = await api('/payables/bills', { ...body, purchaseOrderId: orderId }, token); assert.equal(linked.status, 200); assert.equal(linked.data.purchaseOrderId, orderId);
-  const payment = { id: uuid(), expectedVersion: 0, amountPaise: 4000, paymentDate: '2026-01-02', method: 'CASH', reference: 'Supplier signed receipt' };
+  const payment = { id: uuid(), expectedVersion: 0, amountPaise: 4000, paymentDate: '2026-01-02', method: 'OTHER', reference: 'Supplier signed receipt' };
   for (const invalid of [{ amountPaise: 10001 }, { amountPaise: 0 }, { amountPaise: -1 }, { amountPaise: 1.5 }, { amountPaise: 1000000000001 },
     { paymentDate: '2025-12-31' }, { paymentDate: '2099-01-01' }, { method: 'GATEWAY' }, { reference: '' }]) {
     assert.equal((await api(`/payables/bills/${body.id}/payments`, { ...payment, ...invalid }, token)).status, 400);
@@ -133,7 +133,7 @@ test('bill and payment validation is atomic and purchase links must match the su
 
 test('the final supported payment slot must settle the balance rather than strand an open bill', async () => {
   const token = await owner(); const body = await billFixture(token); assert.equal((await api('/payables/bills', body, token)).status, 200);
-  const payment = { amountPaise: 1, paymentDate: '2026-01-02', method: 'CASH', reference: 'Small recorded installment' };
+  const payment = { amountPaise: 1, paymentDate: '2026-01-02', method: 'OTHER', reference: 'Small recorded installment' };
   for (let expectedVersion = 0; expectedVersion < 99; expectedVersion++) {
     assert.equal((await api(`/payables/bills/${body.id}/payments`, { ...payment, id: uuid(), expectedVersion }, token)).status, 200);
   }
@@ -162,7 +162,7 @@ test('supplier payables enforce explicit owner/manager permissions and isolate r
   assert.equal((await api('/purchasing/suppliers', { id: body.supplierId, name: 'Beta payable supplier' }, beta, '/t/beta')).status, 200);
   const betaBill = await api('/payables/bills', body, beta, '/t/beta'); assert.equal(betaBill.status, 200);
   assert.equal(betaBill.data.supplierName, 'Beta payable supplier'); assert.equal(betaBill.data.paidPaise, 0);
-  const payment = { id: uuid(), expectedVersion: 1, amountPaise: 500, paymentDate: '2026-01-02', method: 'CASH', reference: 'Independent payment' };
+  const payment = { id: uuid(), expectedVersion: 1, amountPaise: 500, paymentDate: '2026-01-02', method: 'OTHER', reference: 'Independent payment' };
   assert.equal((await api(`/payables/bills/${body.id}/payments`, payment, token)).status, 200);
   assert.equal((await api(`/payables/bills/${body.id}/payments`, { ...payment, expectedVersion: 0 }, beta, '/t/beta')).status, 200);
   assert.equal((await api(`/payables/bills/${body.id}`, undefined, token)).data.bill.paidPaise, 600);

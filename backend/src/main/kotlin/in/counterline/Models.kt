@@ -76,7 +76,7 @@ data class Order(
     val bill: Bill, val status: String, val paidAt: String?, val cashReceivedPaise: Long?,
     val kitchen: KitchenTicket?, val createdBy: String? = null, val paidBy: String? = null,
     val checkId: String? = null, val currentTableLabel: String? = null,
-    val inventory: StockSnapshot? = null,
+    val inventory: StockSnapshot? = null, val cashShiftId: String? = null,
 )
 
 @Serializable
@@ -111,7 +111,7 @@ fun Order.forKitchen() = KitchenOrder(KitchenBill(bill.id, bill.billNumber, bill
     currentTableLabel ?: bill.tableLabel, bill.lines.map { KitchenLine(it.itemId, it.name, it.quantity) }), status, kitchen)
 
 @Serializable
-data class CashPayment(val receivedPaise: Long)
+data class CashPayment(val receivedPaise: Long, val cashShiftId: String? = null)
 
 @Serializable
 data class SalesReport(val date: String, val timezone: String, val paidOrders: Long, val totalPaise: Long)

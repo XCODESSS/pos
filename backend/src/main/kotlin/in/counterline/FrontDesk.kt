@@ -25,9 +25,11 @@ import javax.sql.DataSource
 @Serializable data class OpenCheck(val id: String, val tableId: String)
 @Serializable data class SubmitBatch(val id: String, val expectedVersion: Long, val lines: List<CartLine>)
 @Serializable data class CheckTransfer(val id: String, val expectedVersion: Long, val tableId: String)
-@Serializable data class CheckCash(val id: String, val expectedVersion: Long, val amountPaise: Long)
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Serializable data class CheckCash(val id: String, val expectedVersion: Long, val amountPaise: Long,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER) val cashShiftId: String? = null)
 @Serializable data class CloseEmptyCheck(val id: String, val expectedVersion: Long)
-@Serializable data class CheckPayment(val id: String, val amountPaise: Long, val receivedAt: String, val receivedBy: String)
+@Serializable data class CheckPayment(val id: String, val amountPaise: Long, val receivedAt: String, val receivedBy: String, val cashShiftId: String? = null)
 @Serializable data class RunningCheck(
     val id: String, val number: String, val table: DiningTable, val version: Long,
     val createdAt: String, val closedAt: String?, val status: String,
@@ -37,7 +39,7 @@ import javax.sql.DataSource
 /** Single-outlet front desk. Writes and aggregate reads share one transaction lock.
  * Batch bills are immutable; payments belong to the check, never to individual KOTs.
  */
-class FrontDesk(private val source: DataSource, private val json: Json, private val checkout: Checkout) {
+class FrontDesk(private val source: DataSource, private val json: Json, private val checkout: Checkout, private val cash: CashControl) {
     private val tableSelect = """
         SELECT t.*, c.id AS current_check FROM dining_tables t
         LEFT JOIN running_checks c ON c.table_id = t.id AND c.closed_at IS NULL
@@ -146,9 +148,10 @@ class FrontDesk(private val source: DataSource, private val json: Json, private 
         val current = writable(connection, key, body.expectedVersion)
         checkInput(body.amountPaise in 1..current.duePaise, "Record exact received cash between one paisa and the remaining balance. Change is not supported for splits.")
         checkInput(current.payments.size < 200, "A check supports at most 200 payments.")
+        cash.post(connection, body.cashShiftId, CashKind.CHECK_PAYMENT, body.id, body.amountPaise, actor)
         remember(connection, body.id, key, fingerprint)
-        connection.prepareStatement("INSERT INTO check_payments(id,check_id,amount_paise,received_by) VALUES (?,?,?,?)").use {
-            it.setObject(1, uuid(body.id)); it.setObject(2, key); it.setLong(3, body.amountPaise); it.setObject(4, uuid(actor)); it.executeUpdate()
+        connection.prepareStatement("INSERT INTO check_payments(id,check_id,amount_paise,received_by,cash_shift_id) VALUES (?,?,?,?,?)").use {
+            it.setObject(1, uuid(body.id)); it.setObject(2, key); it.setLong(3, body.amountPaise); it.setObject(4, uuid(actor)); it.setObject(5, stockId(body.cashShiftId!!)); it.executeUpdate()
         }
         bump(connection, key)
         if (body.amountPaise == current.duePaise) {
@@ -189,7 +192,7 @@ class FrontDesk(private val source: DataSource, private val json: Json, private 
             val batches = checkout.batches(connection, id)
             val payments = connection.prepareStatement("SELECT * FROM check_payments WHERE check_id=? ORDER BY received_at,id").use { statement ->
                 statement.setObject(1, id); statement.executeQuery().use { values -> buildList { while (values.next()) add(CheckPayment(
-                    values.getObject("id").toString(), values.getLong("amount_paise"), values.getTimestamp("received_at").toInstant().toString(), values.getObject("received_by").toString(),
+                    values.getObject("id").toString(), values.getLong("amount_paise"), values.getTimestamp("received_at").toInstant().toString(), values.getObject("received_by").toString(), values.getObject("cash_shift_id")?.toString(),
                 )) } }
             }
             val total = batches.sumOf { it.bill.totalPaise }; val paid = payments.sumOf { it.amountPaise }

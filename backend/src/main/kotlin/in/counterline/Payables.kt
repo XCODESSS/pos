@@ -12,7 +12,7 @@ import java.util.UUID
 import javax.sql.DataSource
 
 /** Recorded supplier liabilities. Never receives stock or initiates a bank/gateway payment. */
-class Payables(private val source: DataSource, private val json: Json) {
+class Payables(private val source: DataSource, private val json: Json, private val cash: CashControl) {
     private fun <T> transaction(action: (Connection) -> T): T = databaseTransaction(source) { connection ->
         connection.prepareStatement("SELECT pg_advisory_xact_lock(27418,10)").use { it.execute() }
         action(connection)
@@ -108,9 +108,13 @@ class Payables(private val source: DataSource, private val json: Json) {
         }
         checkInput(count < 100, "A supplier bill supports at most 100 payment records.")
         checkInput(count < 99 || body.amountPaise == current.outstandingPaise, "The final supported payment record must settle the balance. Do not claim a larger payment than actually made.")
-        val payment = connection.prepareStatement("INSERT INTO supplier_payments(id,bill_id,amount_paise,payment_date,method,reference_text,fingerprint,actor_id) VALUES(?,?,?,?,?,?,?,?) RETURNING *").use {
+        if (body.method == SupplierPaymentMethod.CASH) {
+            cash.requireToday(body.paymentDate)
+            cash.post(connection, body.cashShiftId, CashKind.SUPPLIER_PAYMENT, body.id, body.amountPaise, actor)
+        } else checkInput(body.cashShiftId == null, "Noncash payments cannot be assigned to a cash shift.")
+        val payment = connection.prepareStatement("INSERT INTO supplier_payments(id,bill_id,amount_paise,payment_date,method,reference_text,fingerprint,actor_id,cash_shift_id) VALUES(?,?,?,?,?,?,?,?,?) RETURNING *").use {
             it.setObject(1, id); it.setObject(2, key); it.setLong(3, body.amountPaise); it.setObject(4, paymentDate); it.setString(5, body.method.name)
-            it.setString(6, body.reference); it.setString(7, hash); it.setObject(8, stockId(actor)); it.executeQuery().use { rows -> check(rows.next()); decodePayment(rows) }
+            it.setString(6, body.reference); it.setString(7, hash); it.setObject(8, stockId(actor)); it.setObject(9, body.cashShiftId?.let(::stockId)); it.executeQuery().use { rows -> check(rows.next()); decodePayment(rows) }
         }
         connection.prepareStatement("UPDATE supplier_bills SET paid_paise=paid_paise+?,version=version+1,status=? WHERE id=?").use {
             it.setLong(1, body.amountPaise); it.setString(2, if (body.amountPaise == current.outstandingPaise) "PAID" else "OPEN"); it.setObject(3, key); it.executeUpdate()
@@ -135,7 +139,7 @@ class Payables(private val source: DataSource, private val json: Json) {
     }
     private fun decodePayment(rows: ResultSet) = SupplierPayment(rows.getObject("id").toString(), rows.getLong("sequence").toString(), rows.getObject("bill_id").toString(),
         rows.getLong("amount_paise"), rows.getDate("payment_date").toLocalDate().toString(), SupplierPaymentMethod.valueOf(rows.getString("method")), rows.getString("reference_text"),
-        rows.getObject("actor_id").toString(), rows.getTimestamp("created_at").toInstant().toString())
+        rows.getObject("actor_id").toString(), rows.getTimestamp("created_at").toInstant().toString(), rows.getObject("cash_shift_id")?.toString())
     private fun bill(connection: Connection, id: UUID): SupplierBill = connection.prepareStatement("SELECT * FROM supplier_bills WHERE id=?").use {
         it.setObject(1, id); it.executeQuery().use { rows -> if (rows.next()) decodeBill(rows) else throw Problem(404, "supplier_bill_not_found", "Supplier bill not found.") }
     }

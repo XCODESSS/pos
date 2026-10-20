@@ -102,4 +102,16 @@ _Avoid_: Receipt (payment document), bill (amount owed)
 
 **Served**: The ready dishes have been handed over to the customer or serving staff; the kitchen ticket is complete. This does not imply payment.
 
+**Shared cash drawer**: The outlet's single pool of physical cash used by its authorized staff. It is not a separate balance for each cashier.
+
+**Cash shift**: An explicitly opened and closed period of responsibility for the shared drawer, with its opening count, cash movements and final count.
+
+**Opening float**: Cash physically counted in the drawer when a shift opens. It is not sales income or an automatic carry-forward of the previous shift's expected balance.
+
+**Operating expense**: Money already spent on restaurant operations, such as cleaning or utilities. It is not a supplier bill payment, stock receipt or unpaid liability.
+
+**Expected cash**: Opening float plus cash received net of change, less recorded cash operating expenses and supplier payments.
+
+**Cash discrepancy**: Physically counted closing cash minus expected cash. Explaining a discrepancy does not erase or rewrite the underlying transactions.
+
 **Recorded cash payment**: A staff assertion that physical cash was received against a bill. It is not a payment-gateway transaction.

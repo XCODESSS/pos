@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { api, dish, login, uuid } from './http.mjs';
+import { cashApi as api, dish, login, uuid } from './http.mjs';
 
 async function ingredient(token, name = 'Paneer', unit = 'G', tenantPath) {
   const response = await api('/inventory/ingredients', { id: uuid(), name: `${name} ${uuid().slice(0, 8)}`, unit, lowStockMilli: 100000 }, token, tenantPath);

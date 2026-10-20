@@ -28,7 +28,7 @@ The source address is the actual connection peer; forwarded headers are not trus
 
 ## Business permissions and attribution
 
-Owner manages staff; manager manages menu and operations; cashier handles checkout/cash and can only read KDS; kitchen prepares tickets without menu prices, receipt totals, cash or sales reports. Hiding navigation is not the security control—the backend enforces permissions independently.
+Owner manages staff; manager manages menu and operations; cashier handles checkout/cash and can only read KDS; kitchen prepares tickets without menu prices, receipt totals, cash or sales reports. CASH_CONTROL is explicitly granted to owner/manager for drawer totals, opening/closing and expenses. CASH_SHIFT_ACTIVE grants owner/manager/cashier only the open drawer ID/sequence needed for sales. Kitchen has neither permission. Hiding navigation is not the security control—the backend enforces permissions independently.
 
 New orders record the creating staff ID; cash settlements record the receiving staff ID. Transactional audit events cover successful identity/catalog/order mutations. Replays do not duplicate financial attribution/events. Historical anonymous records remain null; do not infer that the initial owner performed old actions. The current audit table is internal, not a tamper-evident accounting ledger or a finished audit-viewer feature.
 
