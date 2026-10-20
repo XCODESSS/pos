@@ -41,7 +41,9 @@ struct StockWarning: Decodable, Identifiable {
 struct RecipeGap: Decodable { let label: String }
 struct StockSnapshot: Decodable { let warnings: [StockWarning]; let missingRecipes: [RecipeGap] }
 struct Order: Decodable { let bill: Bill; let status: String; let inventory: StockSnapshot? }
-struct CashPayment: Encodable { let receivedPaise: Int64 }
+struct CashPayment: Codable { let receivedPaise: Int64; let cashShiftId: String }
+struct ActiveCashShift: Decodable { let id: String }
+struct CashActive: Decodable { let shift: ActiveCashShift? }
 struct SalesReport: Decodable { let date: String; let paidOrders: Int; let totalPaise: Int64 }
 struct APIErrorBody: Decodable { let message: String }
 struct RequestFailure: LocalizedError {

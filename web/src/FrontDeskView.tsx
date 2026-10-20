@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiFailure, kitchenLabels, localTime, money, request, type CartLine, type DiningTable, type MenuItem, type RunningCheck } from './api';
 import { addLine, CartLines, describeLine, MenuPicker, quantityChange } from './MenuComposer';
 import { StockWarnings, StockPreviewPanel } from './StockWarnings';
+import { requireCashShift } from './cash';
 
 import { storageKey, tenantSlug } from './Tenant';
 const PENDING = tenantSlug ? storageKey('frontdesk.pending') : '';
@@ -118,8 +119,8 @@ export function FrontDeskView({ token, canManage, canOrder, canPay, initialCheck
     if (!check || !lines.length) return;
     void execute({ kind: 'check', path: `/checks/${check.id}/batches`, body: { id: crypto.randomUUID(), expectedVersion: check.version, lines }, clearDraft: true });
   }
-  function recordCash(exact = false) {
-    if (!check) return;
+  async function recordCash(exact = false) {
+    if (!check || lock.current || blocked) return;
     if (lines.length) { setError('Submit or discard the unsent batch before settlement.'); return; }
     let paise = check.duePaise;
     if (!exact) {
@@ -127,7 +128,12 @@ export function FrontDeskView({ token, canManage, canOrder, canPay, initialCheck
       const [whole, fraction = ''] = amount.split('.'); paise = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
     }
     if (paise < 1 || paise > check.duePaise) { setError('Cash must be positive and cannot exceed the balance due.'); return; }
-    setCashConfirmation({ amountPaise: paise, command: { kind: 'check', path: `/checks/${check.id}/cash-payments`, body: { id: crypto.randomUUID(), expectedVersion: check.version, amountPaise: paise } } });
+    lock.current = true; setBusy(true); setError('');
+    try {
+      const cashShiftId = await requireCashShift(token);
+      if (mounted.current) setCashConfirmation({ amountPaise: paise, command: { kind: 'check', path: `/checks/${check.id}/cash-payments`, body: { id: crypto.randomUUID(), expectedVersion: check.version, amountPaise: paise, cashShiftId } } });
+    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : 'Cash shift unavailable.'); }
+    finally { lock.current = false; if (mounted.current) setBusy(false); }
   }
   const destinations = tables.filter(table => table.active && !table.checkId);
   const floors = [...new Set(tables.map(table => table.floor))];
@@ -135,7 +141,7 @@ export function FrontDeskView({ token, canManage, canOrder, canPay, initialCheck
     <div className="workspace-notice">A table is released after full settlement, even if food is still preparing. The first payment locks additions. Sales recognize the full check only on final settlement; partial cash is listed on the check. Splits are by amount, not by guest/item. Demo bills are not GST invoices.</div>
     {error && <p className="error" role="alert">{error}</p>}{notice && <p className="success-note" role="status">{notice}</p>}
     {pending && <div className="recovery-banner"><p>{busy ? 'Saving…' : 'An action is unconfirmed. The exact request is saved in this browser tab. Retry it before doing anything else.'}</p><button className="primary" disabled={busy} onClick={() => void execute(pending)}>Retry same front-desk action</button></div>}
-    {cashConfirmation && <section className="cash-confirmation" aria-label="Confirm received cash" role="region"><h3>Confirm physical cash received</h3><p>Amount: <strong>{money(cashConfirmation.amountPaise)}</strong>. The first payment locks dish additions. This records cash; it does not process a digital payment.</p><button className="primary" disabled={busy} onClick={() => { if (lock.current) return; const command = cashConfirmation.command; setCashConfirmation(null); void execute(command); }}>Confirm cash received</button><button className="secondary" disabled={busy} onClick={() => setCashConfirmation(null)}>Cancel cash confirmation</button></section>}
+    {cashConfirmation && <section className="cash-confirmation" aria-label="Confirm received cash" role="region"><h3>Confirm physical cash received</h3><p>Amount: <strong>{money(cashConfirmation.amountPaise)}</strong>. The first payment locks dish additions. This posts to the shared drawer selected for this review; it does not process a digital payment.</p><button className="primary" disabled={busy} onClick={() => { if (lock.current) return; const command = cashConfirmation.command; setCashConfirmation(null); void execute(command); }}>Confirm cash received</button><button className="secondary" disabled={busy} onClick={() => setCashConfirmation(null)}>Cancel cash confirmation</button></section>}
     <div className="floor-board">{floors.map(floor => <section key={floor}><h3>{floor}</h3><div className="table-grid">{tables.filter(table => table.floor === floor).map(table => <button key={table.id} className={`table-card ${table.checkId ? 'occupied' : ''}`} disabled={blocked || (!table.checkId && (!table.active || !canOrder))} onClick={() => openTable(table)}><strong>{table.label}</strong><span>{table.seats} seats</span><small>{table.checkId ? 'Occupied · open check →' : table.active ? 'Available · open table' : 'Inactive'}</small></button>)}</div></section>)}</div>
     {loaded && !tables.length && <p className="workspace-notice">No tables yet. {canManage ? 'Create your floor and first table below.' : 'Ask an owner or manager to create tables.'}</p>}
     <form className="recover-form" onSubmit={event => { event.preventDefault(); void openExisting(recover.trim()); }}><label htmlFor="recover-check">Recover check by ID</label><input id="recover-check" value={recover} required maxLength={36} placeholder="Check UUID, including closed receipts" onChange={event => setRecover(event.target.value)}/><button className="secondary" disabled={blocked}>Open check</button></form>

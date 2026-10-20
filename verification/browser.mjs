@@ -302,3 +302,67 @@ const payableSwitch = await capture('payables-tenant-switch', { ...payableScenar
 const betaPayableText = payableSwitch.steps.at(-1).artifacts.accessibility.value.text;
 assert.ok(!betaPayableText.includes('Browser supplier invoice') && !betaPayableText.includes('Retry same supplier action'));
 assert.ok(!inventoryResult.steps.find(step => step.step_id === 'shortage-preview').artifacts.accessibility.value.text.includes('Supplier bills & payments'), 'cashier has no payable navigation');
+assert.ok(!inventoryResult.steps.find(step => step.step_id === 'shortage-preview').artifacts.accessibility.value.text.includes('Cash drawer & expenses'), 'cashier has no drawer administration navigation');
+
+const previousDrawer = (await api('/cash/active', undefined, token)).data.shift;
+const previousCash = (await api(`/cash/shifts/${previousDrawer.id}`, undefined, token)).data;
+assert.equal((await api(`/cash/shifts/${previousDrawer.id}/close`, { id: uuid(), expectedVersion: previousCash.version, countedPaise: previousCash.expectedPaise }, token)).status, 200);
+const cashBillId = uuid();
+assert.equal((await api('/payables/bills', { id: cashBillId, supplierId: purchasedOrder.supplierId, reference: 'Browser cash supplier bill', billDate: '2026-01-01', dueDate: '2026-01-31', totalPaise: 50000 }, token)).status, 200);
+substitutions.CASH_SUPPLIER_BILL = cashBillId;
+const cashScenario = fill(JSON.parse(await readFile(new URL('./rea-cash-control.json', import.meta.url), 'utf8')));
+await capture('cash-control', cashScenario);
+const browserShift = (await api('/cash/shifts?limit=10', undefined, token)).data.shifts.find(value => value.reference === 'Browser shared drawer');
+assert.ok(browserShift); assert.equal(browserShift.status, 'CLOSED'); assert.equal(browserShift.openingPaise, 100000);
+assert.equal(browserShift.expensesPaise, 25000); assert.equal(browserShift.supplierPaise, 10000); assert.equal(browserShift.salesPaise, 0);
+assert.equal(browserShift.expectedPaise, 65000); assert.equal(browserShift.countedPaise, 64900); assert.equal(browserShift.discrepancyPaise, -100);
+const browserExpense = (await api('/expenses?limit=10', undefined, token)).data.expenses.find(value => value.reference === 'Browser cleaning receipt');
+assert.ok(browserExpense); assert.equal(browserExpense.cashShiftId, browserShift.id);
+const expenseRetry = { kind: 'expense', path: '/expenses', shiftId: browserShift.id,
+  body: { id: browserExpense.id, payee: browserExpense.payee, category: browserExpense.category, reference: browserExpense.reference, expenseDate: browserExpense.expenseDate, amountPaise: browserExpense.amountPaise, method: 'CASH', cashShiftId: browserShift.id }, summary: ['Recover the original expense, not another cash outflow.'] };
+const cashRecovery = await capture('cash-control-narrow-recovery', { ...cashScenario,
+  environment: { ...cashScenario.environment, viewport: { width: 390, height: 844, device_scale_factor: 1 } },
+  storage: { session_storage: [{ origin: process.env.VERIFY_BASE_URL, entries: [{ name: 'counterline.tenant.alpha.cash.control.pending', value: { source: 'literal', value: JSON.stringify(expenseRetry) } }] }] },
+  actions: [...cashScenario.actions.slice(0, 4),
+    { step_id: 'retry-expense', action: 'click', locator: { kind: 'role', role: 'button', name: 'Retry same cash-control action' } },
+    { step_id: 'unchanged-close', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail:has-text("Expected ₹650.00"):has-text("Counted ₹649.00")' }, state: 'visible' },
+    { step_id: 'expense-id', action: 'fill', locator: { kind: 'css', selector: '#recover-expense' }, value: { source: 'literal', value: browserExpense.id } },
+    { step_id: 'recover-expense', action: 'click', locator: { kind: 'role', role: 'button', name: 'Open operating expense' } },
+    { step_id: 'expense-evidence', action: 'wait_for', locator: { kind: 'css', selector: '[aria-label="Recovered operating expense"]:has-text("Browser cleaning receipt")' }, state: 'visible' },
+    { step_id: 'summary', action: 'click', locator: { kind: 'css', selector: '.purchase-detail > h3' } },
+  ],
+});
+assert.ok(!cashRecovery.steps.at(-1).artifacts.storage.value.session_storage.some(entry => entry.name === 'counterline.tenant.alpha.cash.control.pending'));
+assert.deepEqual((await api(`/cash/shifts/${browserShift.id}`, undefined, token)).data, browserShift);
+assert.equal((await api(`/cash/shifts/${browserShift.id}/movements`, undefined, token)).data.movements.length, 2);
+const staleShiftId = uuid();
+assert.equal((await api('/cash/shifts', { id: staleShiftId, openingPaise: 10000, reference: 'Stale close fixture' }, token)).status, 200);
+const staleClose = { kind: 'close', path: `/cash/shifts/${staleShiftId}/close`, shiftId: staleShiftId, body: { id: uuid(), expectedVersion: 0, countedPaise: 10000, reason: '' }, summary: ['Old count before spending.'] };
+assert.equal((await api('/expenses', { ...expenseRetry.body, id: uuid(), amountPaise: 1000, cashShiftId: staleShiftId, reference: 'Spending during count' }, token)).status, 200);
+await capture('cash-control-stale-close', { ...cashScenario,
+  storage: { session_storage: [{ origin: process.env.VERIFY_BASE_URL, entries: [{ name: 'counterline.tenant.alpha.cash.control.pending', value: { source: 'literal', value: JSON.stringify(staleClose) } }] }] },
+  actions: [...cashScenario.actions.slice(0, 4),
+    { step_id: 'retry-stale', action: 'click', locator: { kind: 'role', role: 'button', name: 'Retry same cash-control action' } },
+    { step_id: 'stale-rejected', action: 'wait_for', locator: { kind: 'css', selector: '.error:has-text("Drawer changed")' }, state: 'visible' },
+    { step_id: 'reload-required', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail:has-text("Reload and recount")' }, state: 'visible' },
+    { step_id: 'reload', action: 'click', locator: { kind: 'role', role: 'button', name: 'Discard count and reload drawer' } },
+    { step_id: 'recount', action: 'fill', locator: { kind: 'css', selector: '#cash-counted' }, value: { source: 'literal', value: '90' } },
+    { step_id: 'review-close', action: 'click', locator: { kind: 'role', role: 'button', name: 'Review closing drawer' } },
+    { step_id: 'confirm-close', action: 'click', locator: { kind: 'role', role: 'button', name: 'Confirm cash-control action' } },
+    { step_id: 'closed', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail .purchase-status:has-text("CLOSED")' }, state: 'visible' },
+  ],
+});
+const staleClosed = (await api(`/cash/shifts/${staleShiftId}`, undefined, token)).data;
+assert.equal(staleClosed.expectedPaise, 9000); assert.equal(staleClosed.countedPaise, 9000); assert.equal(staleClosed.discrepancyPaise, 0);
+const cashSwitch = await capture('cash-control-tenant-switch', { ...cashScenario,
+  start_url: { url: `${process.env.VERIFY_BASE_URL}/t/beta/` },
+  storage: { session_storage: [{ origin: process.env.VERIFY_BASE_URL, entries: [
+    { name: 'counterline.tenant.alpha.cash.control.pending', value: { source: 'literal', value: JSON.stringify(expenseRetry) } },
+    { name: 'counterline.tenant.alpha.cash.control.selected', value: { source: 'literal', value: browserShift.id } },
+  ] }] },
+  actions: [...cashScenario.actions.slice(0, 4), { step_id: 'beta-drawer', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail:has-text("Independent beta drawer")' }, state: 'visible' }],
+});
+const betaCashText = cashSwitch.steps.at(-1).artifacts.accessibility.value.text;
+assert.ok(!betaCashText.includes('Browser shared drawer') && !betaCashText.includes('Retry same cash-control action'));
+assert.deepEqual((await api('/inventory', undefined, token)).data, stockBeforeBills);
+assert.deepEqual((await api('/reports/today', undefined, token)).data, salesBeforeBills);

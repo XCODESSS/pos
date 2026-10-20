@@ -85,7 +85,20 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun pay() = perform {
         val current = requireNotNull(order)
-        order = api.post(base, token, "/orders/${current.bill.id}/cash-payment", CashPayment(current.bill.totalPaise))
+        require(preferences.getString("base", null) == base.trimEnd('/')) { "Restore the original server URL before recording cash." }
+        val retained = preferences.getString("cash.pending", null)
+        val payment = if (retained != null) api.json.decodeFromString<CashPayment>(retained) else {
+            val active = api.get<CashActive>(base, token, "/cash/active")
+            CashPayment(current.bill.totalPaise, requireNotNull(active.shift) { "Ask an owner/manager to open the shared cash drawer first." }.id)
+        }
+        withContext(Dispatchers.IO) { check(preferences.edit().putString("cash.pending", api.json.encodeToString(payment)).commit()) { "Could not retain cash command. No payment submitted." } }
+        try {
+            order = api.post(base, token, "/orders/${current.bill.id}/cash-payment", payment)
+            withContext(Dispatchers.IO) { check(preferences.edit().remove("cash.pending").commit()) }
+        } catch (failure: RequestFailed) {
+            if (failure.status in setOf(400, 403, 404, 409)) withContext(Dispatchers.IO) { check(preferences.edit().remove("cash.pending").commit()) }
+            throw failure
+        }
         report = api.get(base, token, "/reports/today")
     }
     fun newSale() = perform {

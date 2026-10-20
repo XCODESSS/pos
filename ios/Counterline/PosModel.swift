@@ -5,6 +5,7 @@ private struct CheckoutJournal: Codable {
     let base: String
     let pending: CreateOrder?
     let currentId: String?
+    var cashPayment: CashPayment? = nil
 }
 
 @MainActor
@@ -92,7 +93,25 @@ final class PosModel: ObservableObject {
     }
     func pay() { run {
         guard let current = self.order else { return }
-        self.order = try await self.api.post("/orders/\(current.bill.id)/cash-payment", body: CashPayment(receivedPaise: current.bill.totalPaise))
+        let journal = try self.load()
+        guard journal?.base == self.base, journal?.currentId == current.bill.id else {
+            throw RequestFailure(status: 0, message: "Restore the original server URL and bill before recording cash.")
+        }
+        let payment: CashPayment
+        if let retained = journal?.cashPayment { payment = retained }
+        else {
+            let active: CashActive = try await self.api.get("/cash/active")
+            guard let shift = active.shift else { throw RequestFailure(status: 409, message: "Ask an owner/manager to open the shared cash drawer first.") }
+            payment = CashPayment(receivedPaise: current.bill.totalPaise, cashShiftId: shift.id)
+        }
+        try self.save(CheckoutJournal(base: self.base, pending: nil, currentId: current.bill.id, cashPayment: payment))
+        do {
+            self.order = try await self.api.post("/orders/\(current.bill.id)/cash-payment", body: payment)
+            try self.save(CheckoutJournal(base: self.base, pending: nil, currentId: current.bill.id))
+        } catch let failure as RequestFailure {
+            if [400, 403, 404, 409].contains(failure.status) { try self.save(CheckoutJournal(base: self.base, pending: nil, currentId: current.bill.id)) }
+            throw failure
+        }
         self.report = try await self.api.get("/reports/today")
     } }
     func newSale() { run {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiFailure, localTime, request } from './api';
 import { storageKey } from './Tenant';
 import type { Supplier } from './purchasing';
+import type { CashActive } from './cash';
 import { indiaDate, payableMoney, payablePaise, type PayableSummary, type SupplierBill, type SupplierBillDetail, type SupplierBillPage, type SupplierPayment } from './payables';
 import './purchasing.css';
 
@@ -17,6 +18,7 @@ export function PayablesView({ token, canManage }: { token: string; canManage: b
   const [billDate, setBillDate] = useState(indiaDate); const [dueDate, setDueDate] = useState(indiaDate); const [purchaseId, setPurchaseId] = useState('');
   const [detail, setDetail] = useState<SupplierBillDetail | null>(null); const [lookupId, setLookupId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState(''); const [paymentDate, setPaymentDate] = useState(indiaDate); const [method, setMethod] = useState('BANK_TRANSFER');
+  const [cashShiftId, setCashShiftId] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState(''); const [voidReason, setVoidReason] = useState(''); const [stale, setStale] = useState(false);
   const [review, setReview] = useState<Command | null>(null); const [pending, setPending] = useState<Command | null>(saved);
   const [busy, setBusy] = useState(false); const [ready, setReady] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
@@ -30,9 +32,9 @@ export function PayablesView({ token, canManage }: { token: string; canManage: b
     if (mounted.current) { setSuppliers(vendors.suppliers); setSummary(balances); setReady(true); }
   }
   async function load(id: string) {
-    const value = await request<SupplierBillDetail>(token, `/payables/bills/${encodeURIComponent(id)}`);
+    const [value, drawer] = await Promise.all([request<SupplierBillDetail>(token, `/payables/bills/${encodeURIComponent(id)}`), request<CashActive>(token, '/cash/active')]);
     if (mounted.current) {
-      setDetail(value); setPaymentAmount(''); setPaymentReference(''); setPaymentDate(indiaDate()); setVoidReason(''); setStale(false);
+      setDetail(value); setCashShiftId(drawer.shift?.id ?? null); setPaymentAmount(''); setPaymentReference(''); setPaymentDate(indiaDate()); setVoidReason(''); setStale(false);
       sessionStorage.setItem(selectedKey(), id);
     }
   }
@@ -95,7 +97,7 @@ export function PayablesView({ token, canManage }: { token: string; canManage: b
   const overdue = summary?.suppliers.reduce((value, supplier) => value + BigInt(supplier.overduePaise), 0n);
   return <section className="workspace purchasing-workspace" aria-label="Supplier bills and payments">
     <div className="workspace-heading"><div><span className="eyebrow">OWED. RECORDED. RECONCILED.</span><h2>Supplier bills & payments.</h2><p>Track what you owe, and record payments already made.</p></div></div>
-    <p className="workspace-notice">INR totals entered from supplier bills; no tax calculation or stock receiving. Payment recording does not send money or post to a cash shift. Credits, refunds and payment reversals are not supported yet. Only unpaid bills can be voided.</p>
+    <p className="workspace-notice">INR totals entered from supplier bills; no tax calculation or stock receiving. Payment recording does not send money. CASH payments post once to the selected open shared drawer; do not also enter them as expenses. Credits, refunds and payment reversals are not supported yet. Only unpaid bills can be voided.</p>
     {error && <p className="error" role="alert">{error}</p>}{notice && <p className="success-note" role="status">{notice}</p>}
     {pending && <div className="recovery-banner"><p>{busy ? 'Recording supplier action…' : 'Outcome unconfirmed. Retry the exact retained action; do not enter another payment.'}</p><small>Bill ID: {pending.billId}</small><button className="primary" disabled={busy || !canManage} onClick={() => void execute(pending)}>Retry same supplier action</button></div>}
     {review && !pending && <section ref={reviewPanel} className="purchase-review" aria-label="Review supplier action"><h3>Review supplier action</h3>{review.summary.map((text, index) => <p key={index}>{text}</p>)}<div className="purchase-actions"><button className="secondary" disabled={busy} onClick={() => setReview(null)}>Back to supplier bill</button><button className="primary" disabled={busy} onClick={() => void execute(review)}>Confirm supplier action</button></div></section>}
@@ -133,13 +135,15 @@ export function PayablesView({ token, canManage }: { token: string; canManage: b
         <button className="secondary" disabled={busy || !!pending || !!review} onClick={() => void open(bill.id)}>Discard payment draft and reload</button>
         {stale && <p className="workspace-notice">Reload and review before recording another payment or void. The observed bill version will not be updated automatically.</p>}
         {canManage && bill.status === 'OPEN' && <><form className="admin-form delivery-form" onSubmit={event => { event.preventDefault(); prepare(() => {
+          if (method === 'CASH' && !cashShiftId) throw new Error('No open cash shift. Ask an owner/manager to open the drawer, then reload this bill.');
           const amountPaise = payablePaise(paymentAmount); if (amountPaise > bill.outstandingPaise) throw new Error('Payment exceeds the outstanding supplier balance.');
           return { kind: 'payment', path: `/payables/bills/${bill.id}/payments`, billId: bill.id,
-            body: { id: crypto.randomUUID(), expectedVersion: bill.version, amountPaise, paymentDate, method, reference: paymentReference },
-            summary: [`Record ${payableMoney(amountPaise)} already paid to ${bill.supplierName} for ${bill.reference}?`, `${paymentDate} · ${method} · ${paymentReference}`, `Remaining after this record: ${payableMoney(bill.outstandingPaise - amountPaise)}`, 'Confirm only an actual payment already made. This action does not send money. Payment reversal is not yet supported.'] };
+            body: { id: crypto.randomUUID(), expectedVersion: bill.version, amountPaise, paymentDate, method, reference: paymentReference, cashShiftId: method === 'CASH' ? cashShiftId : null },
+            summary: [`Record ${payableMoney(amountPaise)} already paid to ${bill.supplierName} for ${bill.reference}?`, `${paymentDate} · ${method} · ${paymentReference}`, method === 'CASH' ? `Cash drawer: ${cashShiftId}. This reduces drawer cash once; do not record an expense too.` : 'Noncash: no drawer movement.', `Remaining after this record: ${payableMoney(bill.outstandingPaise - amountPaise)}`, 'Confirm only an actual payment already made. This action does not send money. Payment reversal is not yet supported.'] };
         }); }}><h4>Record payment already made</h4><fieldset disabled={blocked || stale}>
           {detail.payments.length >= 99 && <p className="workspace-notice">This preview supports 100 payment records per bill; the last must settle the balance. Do not record an amount larger than actually paid.</p>}
           <label>Payment amount (INR)<input id="supplier-payment-amount" required inputMode="decimal" value={paymentAmount} onChange={event => setPaymentAmount(event.target.value)}/></label>
+          {method === 'CASH' && <p className="workspace-notice">Cash must use today's India date. Drawer: {cashShiftId ?? 'none open — open a shift, then reload this bill'}.</p>}
           <label>Payment date<input id="supplier-payment-date" type="date" required min={bill.billDate} max={indiaDate()} value={paymentDate} onChange={event => setPaymentDate(event.target.value)}/></label>
           <label>Payment method<select id="supplier-payment-method" value={method} onChange={event => setMethod(event.target.value)}><option value="BANK_TRANSFER">Bank transfer</option><option value="UPI">UPI</option><option value="CASH">Cash</option><option value="OTHER">Other</option></select></label>
           <label>Payment evidence / reference<input id="supplier-payment-reference" required maxLength={120} value={paymentReference} onChange={event => setPaymentReference(event.target.value)}/></label><button className="primary">Review supplier payment</button>

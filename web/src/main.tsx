@@ -10,6 +10,8 @@ import { FrontDeskView } from './FrontDeskView';
 import { InventoryView } from './InventoryView';
 import { PurchasingView } from './PurchasingView';
 import { PayablesView } from './PayablesView';
+import { CashControlView } from './CashControlView';
+import { requireCashShift } from './cash';
 import { StockWarnings, StockPreviewPanel } from './StockWarnings';
 import { storageKey, tenantSlug, TenantLanding } from './Tenant';
 import './frontdesk.css';
@@ -23,8 +25,8 @@ function savedRequest(): CreateOrder | null {
   try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || 'null'); } catch { return null; }
 }
 
-type View = 'pos' | 'tables' | 'orders' | 'kitchen' | 'menu' | 'inventory' | 'purchasing' | 'payables' | 'staff' | 'account';
-const viewLabels: Record<View, string> = { pos: 'Point of sale', tables: 'Tables & checks', orders: 'Orders & bills', kitchen: 'Kitchen display', menu: 'Menu management', inventory: 'Inventory & recipes', purchasing: 'Supplier purchasing', payables: 'Supplier bills & payments', staff: 'Staff accounts', account: 'Your account' };
+type View = 'pos' | 'tables' | 'orders' | 'kitchen' | 'menu' | 'inventory' | 'purchasing' | 'payables' | 'cash' | 'staff' | 'account';
+const viewLabels: Record<View, string> = { pos: 'Point of sale', tables: 'Tables & checks', orders: 'Orders & bills', kitchen: 'Kitchen display', menu: 'Menu management', inventory: 'Inventory & recipes', purchasing: 'Supplier purchasing', payables: 'Supplier bills & payments', cash: 'Cash drawer & expenses', staff: 'Staff accounts', account: 'Your account' };
 function Workspace({ session, logout, suspended, passwordChanged }: { session: StaffSession; logout: () => Promise<void>; suspended: boolean; passwordChanged: () => void }) {
   const token = session.accessToken;
   const allowed = (permission: string) => session.permissions.includes(permission);
@@ -33,7 +35,7 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
   const navigation = ([
     ['pos', '▦', 'Point of sale', 'ORDERS_WRITE'], ['tables', '⊞', 'Tables & checks', 'ORDERS_READ'], ['orders', '≡', 'Orders & bills', 'ORDERS_READ'],
     ['kitchen', '♧', 'Kitchen display', 'KITCHEN_READ'], ['menu', '☷', 'Menu management', 'MENU_MANAGE'],
-    ['inventory', '◫', 'Inventory & recipes', 'STOCK_READ'], ['purchasing', '▤', 'Supplier purchasing', 'STOCK_READ'], ['payables', '₹', 'Supplier bills & payments', 'PAYABLES_READ'], ['staff', '♙', 'Staff accounts', 'STAFF_MANAGE'], ['account', '○', 'Your account', ''],
+    ['inventory', '◫', 'Inventory & recipes', 'STOCK_READ'], ['purchasing', '▤', 'Supplier purchasing', 'STOCK_READ'], ['payables', '₹', 'Supplier bills & payments', 'PAYABLES_READ'], ['cash', '▣', 'Cash drawer & expenses', 'CASH_CONTROL'], ['staff', '♙', 'Staff accounts', 'STAFF_MANAGE'], ['account', '○', 'Your account', ''],
   ] as const).filter(([, , , permission]) => !permission || allowed(permission));
   const shownView = navigation.some(([key]) => key === view) ? view : navigation[0][0];
   const actionInFlight = useRef(false);
@@ -110,8 +112,17 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
   }
   async function pay() {
     if (!order) return;
-    const value = await request<Order>(token, `/orders/${order.bill.id}/cash-payment`, { receivedPaise: order.bill.totalPaise });
-    setOrder(value); await refreshReport();
+    const key = storageKey(`cash.order.${order.bill.id}`);
+    const saved = sessionStorage.getItem(key);
+    const body = saved ? JSON.parse(saved) : { receivedPaise: order.bill.totalPaise, cashShiftId: await requireCashShift(token) };
+    sessionStorage.setItem(key, JSON.stringify(body));
+    try {
+      const value = await request<Order>(token, `/orders/${order.bill.id}/cash-payment`, body);
+      sessionStorage.removeItem(key); setOrder(value); await refreshReport();
+    } catch (cause) {
+      if (cause instanceof ApiFailure && [400, 403, 404, 409].includes(cause.status)) sessionStorage.removeItem(key);
+      throw cause;
+    }
   }
   const canOpenOrder = pending === null && (order !== null || quantity === 0);
   async function openOrder(id: string) {
@@ -148,7 +159,7 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
       <div className="session-strip"><span>{session.staff.displayName} <small>· {session.staff.role.toLowerCase()} · Business: {tenantSlug}</small></span><button className="secondary" disabled={busy} onClick={() => void signOut()}>Sign out</button></div>
       {!connected ? <section className="connect-panel"><h2>{busy ? 'Opening your workspace…' : 'Workspace could not be loaded'}</h2><p>Signed in as {session.staff.username}. Existing checkout IDs will be recovered, not recreated.</p>{error && <p className="error" role="alert">{error}</p>}<button className="primary" disabled={busy} onClick={() => void perform(connect)}>Retry loading workspace</button></section> : <>
       {error && <div className="error" role="alert">{error} {pending && 'Your checkout ID is preserved. Retry this bill; do not create another.'}</div>}
-      {suspended ? null : shownView === 'account' ? <PasswordView token={token} onChanged={passwordChanged}/> : shownView === 'staff' ? <StaffView token={token} ownId={session.staff.id}/> : shownView === 'payables' ? <PayablesView token={token} canManage={allowed('PAYABLES_MANAGE')}/> : shownView === 'purchasing' ? <PurchasingView token={token} canManage={allowed('STOCK_MANAGE')}/> : shownView === 'inventory' ? <InventoryView token={token} canManage={allowed('STOCK_MANAGE')}/> : shownView === 'menu' ? <MenuView token={token} onSaved={refreshMenu}/> : shownView === 'tables' ? <FrontDeskView token={token} canManage={allowed('TABLES_MANAGE')} canOrder={allowed('ORDERS_WRITE')} canPay={allowed('CASH_RECORD')} initialCheckId={checkToOpen} onOpened={() => setCheckToOpen(null)} onSettled={refreshReport}/> : shownView === 'orders' ? <OrdersView token={token} busy={busy} canOpen={canOpenOrder} onOpen={openOrder}/> : shownView === 'kitchen' ? <KitchenView token={token} canWrite={allowed('KITCHEN_WRITE')}/> : <div className="pos-layout">
+      {suspended ? null : shownView === 'account' ? <PasswordView token={token} onChanged={passwordChanged}/> : shownView === 'staff' ? <StaffView token={token} ownId={session.staff.id}/> : shownView === 'cash' ? <CashControlView token={token}/> : shownView === 'payables' ? <PayablesView token={token} canManage={allowed('PAYABLES_MANAGE')}/> : shownView === 'purchasing' ? <PurchasingView token={token} canManage={allowed('STOCK_MANAGE')}/> : shownView === 'inventory' ? <InventoryView token={token} canManage={allowed('STOCK_MANAGE')}/> : shownView === 'menu' ? <MenuView token={token} onSaved={refreshMenu}/> : shownView === 'tables' ? <FrontDeskView token={token} canManage={allowed('TABLES_MANAGE')} canOrder={allowed('ORDERS_WRITE')} canPay={allowed('CASH_RECORD')} initialCheckId={checkToOpen} onOpened={() => setCheckToOpen(null)} onSettled={refreshReport}/> : shownView === 'orders' ? <OrdersView token={token} busy={busy} canOpen={canOpenOrder} onOpen={openOrder}/> : shownView === 'kitchen' ? <KitchenView token={token} canWrite={allowed('KITCHEN_WRITE')}/> : <div className="pos-layout">
         <MenuPicker menu={menu} locked={locked} onAdd={line => setCart(previous => addLine(previous, line))} refresh={() => void perform(refreshMenu)}/>
         <section className="ticket" aria-label="Current bill">
           <div className="ticket-heading"><div><span className="eyebrow">THE ORDER</span><h2>{order ? order.bill.billNumber : 'New bill'}</h2></div><span className="ticket-count">{order ? order.status : `${quantity} items`}</span></div>
@@ -158,7 +169,7 @@ function Workspace({ session, logout, suspended, passwordChanged }: { session: S
           {order ? <StockWarnings snapshot={order.inventory ?? null} historical/> : <StockPreviewPanel token={token} lines={cart} disabled={locked}/>}
           <div className="ticket-lines">{order ? order.bill.lines.map((line, index) => <div className="ticket-line" key={index}><div><strong>{line.name}</strong><small>{line.quantity} × {money(line.unitPricePaise)}</small></div><strong>{money(line.subtotalPaise)}</strong></div>) : cart.length ? <CartLines lines={cart} menu={menu} locked={locked} onChange={changeQuantity}/> : <div className="empty-cart"><span>＋</span><h3>A little empty here</h3><p>Tap a menu item to<br/>start your next great order.</p></div>}</div>
           <div className="ticket-bottom"><div className="totals"><div><span>Subtotal</span><span>{money(order?.bill.subtotalPaise ?? subtotal)}</span></div>{order ? <><div><span>CGST</span><span>{money(order.bill.cgstPaise)}</span></div><div><span>SGST</span><span>{money(order.bill.sgstPaise)}</span></div><div className="grand-total"><span>Total payable</span><strong>{money(order.bill.totalPaise)}</strong></div></> : <p>Tax will be shown on the generated bill.</p>}</div>
-          {order?.status === 'PAID' ? <><div className="paid-message" role="status">✓ Cash payment recorded</div><button className="primary full" disabled={busy} onClick={newSale}>Start next sale →</button></> : order ? <><button className="primary full" disabled={busy} onClick={() => void perform(pay)}>{busy ? 'Recording…' : `Record exact cash · ${money(order.bill.totalPaise)}`}</button><small className="payment-note">Confirm you have physically received the cash.</small></> : <button className="primary full" disabled={busy || (!pending && (!quantity || cart.some(line => !describeLine(line, menu).available)))} onClick={() => void perform(checkout)}>{busy ? 'Creating bill…' : pending ? 'Retry same bill →' : 'Create bill →'}</button>}
+          {order?.status === 'PAID' ? <><div className="paid-message" role="status">✓ Cash payment recorded</div><button className="primary full" disabled={busy} onClick={newSale}>Start next sale →</button></> : order ? <><button className="primary full" disabled={busy} onClick={() => void perform(pay)}>{busy ? 'Recording…' : `Record exact cash · ${money(order.bill.totalPaise)}`}</button><small className="payment-note">Confirm you have physically received the cash. An open shared drawer is required; uncertain payments retain their original shift.</small></> : <button className="primary full" disabled={busy || (!pending && (!quantity || cart.some(line => !describeLine(line, menu).available)))} onClick={() => void perform(checkout)}>{busy ? 'Creating bill…' : pending ? 'Retry same bill →' : 'Create bill →'}</button>}
           {order && <button className="secondary full" disabled={busy} onClick={() => void perform(refreshBill)}>Refresh current bill</button>}
           {order?.status === 'OPEN' && <button className="park-button" disabled={busy} onClick={newSale}>Park bill & start next order</button>}
           {order && <><button className="print-button" onClick={() => window.print()}>Print demo bill</button><small className="order-id">Order ID: {order.bill.id}</small></>}
