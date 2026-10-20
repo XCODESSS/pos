@@ -64,7 +64,16 @@ try {
   const delivery = await api(`/purchasing/orders/${purchaseOrder.id}/receipts`, deliveryCommand, token); assert.equal(delivery.status, 200);
   const closeCommand = { id: uuid(), expectedVersion: 1, reason: 'Restore closed remainder' };
   assert.equal((await api(`/purchasing/orders/${purchaseOrder.id}/close`, closeCommand, token)).status, 200);
-  const expected = { purchasing: { purchaseOrder, deliveryCommand, closeCommand, receipt: delivery.data,
+  const billCommand = { id: uuid(), supplierId, purchaseOrderId: purchaseOrder.id, reference: 'Restore supplier invoice', billDate: '2026-01-01', dueDate: '2026-01-31', totalPaise: 12000 };
+  assert.equal((await api('/payables/bills', billCommand, token)).status, 200);
+  const paymentCommand = { id: uuid(), expectedVersion: 0, amountPaise: 4500, paymentDate: '2026-01-02', method: 'BANK_TRANSFER', reference: 'Restore UTR' };
+  const supplierPayment = await api(`/payables/bills/${billCommand.id}/payments`, paymentCommand, token); assert.equal(supplierPayment.status, 200);
+  const voidBill = { ...billCommand, id: uuid(), reference: 'Restore void invoice' }; assert.equal((await api('/payables/bills', voidBill, token)).status, 200);
+  const voidCommand = { id: uuid(), expectedVersion: 0, reason: 'Duplicate entry corrected' };
+  const voided = await api(`/payables/bills/${voidBill.id}/void`, voidCommand, token); assert.equal(voided.status, 200);
+  const expected = { payables: { billCommand, paymentCommand, payment: supplierPayment.data,
+      detail: (await api(`/payables/bills/${billCommand.id}`, undefined, token)).data,
+      summary: (await api('/payables/summary', undefined, token)).data, voidBill, voidCommand, voided: voided.data }, purchasing: { purchaseOrder, deliveryCommand, closeCommand, receipt: delivery.data,
       detail: (await api(`/purchasing/orders/${purchaseOrder.id}`, undefined, token)).data,
       history: (await api(`/inventory/movements?ingredientId=${purchaseIngredientId}`, undefined, token)).data },
     count: { command: countCommand, document: count.data,
@@ -94,7 +103,7 @@ try {
   await waitReady(environment.VERIFY_BASE_URL);
   assert.equal((await api('/auth/me', undefined, token)).status, 200, 'persisted session still resolves after restoring into a different database');
   await promisify(execFile)(process.execPath, ['--test', 'verification/recovery.test.mjs'], { env: { ...environment, VERIFY_RECOVERY_RECORD: record }, timeout: 60_000, maxBuffer: 1024 * 1024 }).then(result => process.stdout.write(result.stdout));
-  console.log('Recovery drill passed: fresh scratch database, original receipt, cash splits, negative stock/ledger, recipe versions, submission snapshot, physical count evidence/replay, purchase order/delivery/closure, persisted session and unchanged sales.');
+  console.log('Recovery drill passed: fresh scratch database, original receipt, cash splits, negative stock/ledger, recipe versions, submission snapshot, physical count evidence/replay, purchase order/delivery/closure, supplier bill/payment/void evidence and replay, persisted session and unchanged sales.');
 } finally {
   await rm(directory, { recursive: true, force: true });
 }

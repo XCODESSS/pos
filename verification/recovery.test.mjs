@@ -34,6 +34,13 @@ test('restored tenant retains settled bill snapshots, split payments and sales e
   const countHistory = await api(`/inventory/movements?ingredientId=${counted.id}`, undefined, accessToken);
   assert.deepEqual(countHistory.data, expected.count.history); assert.equal(countHistory.data.movements.length, 1);
   assert.equal(countHistory.data.movements[0].stockCountId, count.data.id);
+  const payable = expected.payables;
+  assert.deepEqual((await api(`/payables/bills/${payable.billCommand.id}`, undefined, accessToken)).data, payable.detail);
+  assert.deepEqual((await api('/payables/bills', payable.billCommand, accessToken)).data, payable.detail.bill);
+  assert.deepEqual((await api(`/payables/bills/${payable.billCommand.id}/payments`, payable.paymentCommand, accessToken)).data, payable.payment);
+  assert.equal(payable.detail.bill.outstandingPaise, 7500); assert.equal(payable.detail.payments.length, 1);
+  assert.deepEqual((await api(`/payables/bills/${payable.voidBill.id}/void`, payable.voidCommand, accessToken)).data, payable.voided);
+  assert.deepEqual((await api('/payables/summary', undefined, accessToken)).data, payable.summary);
   const purchasing = expected.purchasing;
   assert.deepEqual((await api(`/purchasing/orders/${purchasing.purchaseOrder.id}`, undefined, accessToken)).data, purchasing.detail);
   assert.deepEqual((await api('/purchasing/orders', purchasing.purchaseOrder, accessToken)).data, purchasing.detail.order);
