@@ -38,7 +38,16 @@ test('restored tenant retains settled bill snapshots, split payments and sales e
   assert.deepEqual((await api(`/payables/bills/${payable.billCommand.id}`, undefined, accessToken)).data, payable.detail);
   assert.deepEqual((await api('/payables/bills', payable.billCommand, accessToken)).data, payable.detail.bill);
   assert.deepEqual((await api(`/payables/bills/${payable.billCommand.id}/payments`, payable.paymentCommand, accessToken)).data, payable.payment);
-  assert.equal(payable.detail.bill.outstandingPaise, 7500); assert.equal(payable.detail.payments.length, 1);
+  assert.equal(payable.detail.bill.outstandingPaise, 6500); assert.equal(payable.detail.payments.length, 2);
+  const cash = expected.cash;
+  assert.equal(cash.closed.expectedPaise, 6500); assert.equal(cash.closed.discrepancyPaise, -100);
+  assert.deepEqual((await api(`/cash/shifts/${cash.cashOpen.id}`, undefined, accessToken)).data, cash.closed);
+  assert.deepEqual((await api('/cash/shifts', cash.cashOpen, accessToken)).data, cash.closed);
+  assert.deepEqual((await api(`/cash/shifts/${cash.cashOpen.id}/close`, cash.cashClose, accessToken)).data, cash.closed);
+  assert.deepEqual((await api('/expenses', cash.expenseCommand, accessToken)).data, cash.expense);
+  assert.deepEqual((await api(`/payables/bills/${payable.billCommand.id}/payments`, cash.supplierCashCommand, accessToken)).data, cash.supplierCash);
+  assert.deepEqual((await api(`/cash/shifts/${cash.cashOpen.id}/movements`, undefined, accessToken)).data, cash.movements);
+  assert.deepEqual((await api(`/cash/shifts/${cash.active.id}`, undefined, accessToken)).data, cash.active);
   assert.deepEqual((await api(`/payables/bills/${payable.voidBill.id}/void`, payable.voidCommand, accessToken)).data, payable.voided);
   assert.deepEqual((await api('/payables/summary', undefined, accessToken)).data, payable.summary);
   const purchasing = expected.purchasing;

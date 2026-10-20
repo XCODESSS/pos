@@ -7,7 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { api, dish, login, uuid } from './http.mjs';
+import { cashApi as api, dish, login, uuid } from './http.mjs';
 import { waitReady } from './health.mjs';
 
 const project = process.env.VERIFY_PROJECT;
@@ -71,7 +71,21 @@ try {
   const voidBill = { ...billCommand, id: uuid(), reference: 'Restore void invoice' }; assert.equal((await api('/payables/bills', voidBill, token)).status, 200);
   const voidCommand = { id: uuid(), expectedVersion: 0, reason: 'Duplicate entry corrected' };
   const voided = await api(`/payables/bills/${voidBill.id}/void`, voidCommand, token); assert.equal(voided.status, 200);
-  const expected = { payables: { billCommand, paymentCommand, payment: supplierPayment.data,
+  const existingShiftId = (await api('/cash/active', undefined, token)).data.shift.id;
+  const existingShift = (await api(`/cash/shifts/${existingShiftId}`, undefined, token)).data;
+  assert.equal((await api(`/cash/shifts/${existingShiftId}/close`, { id: uuid(), expectedVersion: existingShift.version, countedPaise: Math.max(0, existingShift.expectedPaise), reason: 'Restore handover' }, token)).status, 200);
+  const cashOpen = { id: uuid(), openingPaise: 10000, reference: 'Restore drawer' };
+  assert.equal((await api('/cash/shifts', cashOpen, token)).status, 200);
+  const cashDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const expenseCommand = { id: uuid(), payee: 'Restore cleaner', category: 'Cleaning', reference: 'Restore operating receipt', expenseDate: cashDate, amountPaise: 2500, method: 'CASH', cashShiftId: cashOpen.id };
+  const expense = await api('/expenses', expenseCommand, token); assert.equal(expense.status, 200);
+  const supplierCashCommand = { id: uuid(), expectedVersion: 1, amountPaise: 1000, paymentDate: cashDate, method: 'CASH', reference: 'Restore supplier cash', cashShiftId: cashOpen.id };
+  const supplierCash = await api(`/payables/bills/${billCommand.id}/payments`, supplierCashCommand, token); assert.equal(supplierCash.status, 200);
+  const cashClose = { id: uuid(), expectedVersion: 2, countedPaise: 6400, reason: 'Restore counted one rupee short' };
+  const closedCash = await api(`/cash/shifts/${cashOpen.id}/close`, cashClose, token); assert.equal(closedCash.status, 200);
+  const cashMovements = (await api(`/cash/shifts/${cashOpen.id}/movements`, undefined, token)).data;
+  const continuation = await api('/cash/shifts', { id: uuid(), openingPaise: 10000, reference: 'Post-restore browser drawer' }, token); assert.equal(continuation.status, 200);
+  const expected = { cash: { cashOpen, cashClose, closed: closedCash.data, expenseCommand, expense: expense.data, supplierCashCommand, supplierCash: supplierCash.data, movements: cashMovements, active: continuation.data }, payables: { billCommand, paymentCommand, payment: supplierPayment.data,
       detail: (await api(`/payables/bills/${billCommand.id}`, undefined, token)).data,
       summary: (await api('/payables/summary', undefined, token)).data, voidBill, voidCommand, voided: voided.data }, purchasing: { purchaseOrder, deliveryCommand, closeCommand, receipt: delivery.data,
       detail: (await api(`/purchasing/orders/${purchaseOrder.id}`, undefined, token)).data,
@@ -103,7 +117,7 @@ try {
   await waitReady(environment.VERIFY_BASE_URL);
   assert.equal((await api('/auth/me', undefined, token)).status, 200, 'persisted session still resolves after restoring into a different database');
   await promisify(execFile)(process.execPath, ['--test', 'verification/recovery.test.mjs'], { env: { ...environment, VERIFY_RECOVERY_RECORD: record }, timeout: 60_000, maxBuffer: 1024 * 1024 }).then(result => process.stdout.write(result.stdout));
-  console.log('Recovery drill passed: fresh scratch database, original receipt, cash splits, negative stock/ledger, recipe versions, submission snapshot, physical count evidence/replay, purchase order/delivery/closure, supplier bill/payment/void evidence and replay, persisted session and unchanged sales.');
+  console.log('Recovery drill passed: fresh scratch database, original receipt, cash splits, negative stock/ledger, recipe versions, submission snapshot, physical count evidence/replay, purchase order/delivery/closure, supplier bill/payment/void evidence, cash-shift/expense reconciliation and replay, persisted session and unchanged sales.');
 } finally {
   await rm(directory, { recursive: true, force: true });
 }

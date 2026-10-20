@@ -11,12 +11,24 @@ if (process.argv[2] === 'before') {
   const body = { id: uuid(), lines: [{ itemId: item.id, quantity: 1 }] };
   const result = await api('/orders', body, token); assert.equal(result.status, 200); assert.equal(result.data.bill.totalPaise, 14700);
   assert.equal((await api(`/orders/${body.id}/cash-payment`, { receivedPaise: 14700 }, token)).status, 200);
-  await mkdir(directory, { recursive: true }); await writeFile(record, JSON.stringify({ body, bill: result.data.bill, itemId: item.id }, null, 2));
+  const tableId = uuid(); const checkId = uuid();
+  assert.equal((await api('/admin/tables', { id: tableId, table: { label: 'Legacy drawer', floor: 'Upgrade', seats: 2 } }, token)).status, 200);
+  assert.equal((await api('/checks', { id: checkId, tableId }, token)).status, 200);
+  assert.equal((await api(`/checks/${checkId}/batches`, { id: uuid(), expectedVersion: 0, lines: [{ itemId: item.id, quantity: 1 }] }, token)).status, 200);
+  const split = { id: uuid(), expectedVersion: 1, amountPaise: 14700 };
+  assert.equal((await api(`/checks/${checkId}/cash-payments`, split, token)).status, 200);
+  await mkdir(directory, { recursive: true }); await writeFile(record, JSON.stringify({ body, bill: result.data.bill, itemId: item.id, checkId, split }, null, 2));
   console.log('Upgrade fixture: legacy image created a persisted paid INR 147 bill.');
 } else if (process.argv[2] === 'after') {
   const expected = JSON.parse(await readFile(record, 'utf8'));
   const order = await api(`/orders/${expected.body.id}`, undefined, token);
   assert.equal(order.status, 200); assert.deepEqual(order.data.bill, expected.bill); assert.equal(order.data.status, 'PAID'); assert.equal(order.data.inventory, null);
+  assert.equal(order.data.cashShiftId, null);
+  assert.equal((await api(`/orders/${expected.body.id}/cash-payment`, { receivedPaise: 14700 }, token)).status, 200);
+  const oldSplit = await api(`/checks/${expected.checkId}/cash-payments`, expected.split, token);
+  assert.equal(oldSplit.status, 200); assert.equal(oldSplit.data.payments.length, 1); assert.equal(oldSplit.data.payments[0].cashShiftId, null);
+  assert.equal((await api('/cash/active', undefined, token)).data.shift, null);
+  assert.deepEqual((await api('/cash/shifts', undefined, token)).data.shifts, []);
   assert.deepEqual((await api('/inventory', undefined, token)).data.ingredients, []);
   const id = uuid();
   assert.equal((await api('/inventory/ingredients', { id, name: 'Upgrade ingredient', unit: 'G', lowStockMilli: 0 }, token)).status, 200);
@@ -25,5 +37,5 @@ if (process.argv[2] === 'before') {
   const replay = await api('/orders', expected.body, token); assert.equal(replay.status, 200); assert.equal(replay.data.inventory, null);
   assert.equal((await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === id).balanceMilli, 100000);
   assert.equal((await api(`/inventory/movements?ingredientId=${id}`, undefined, token)).data.movements.length, 1);
-  console.log('Upgrade gate passed: legacy receipt/payment unchanged, stock history remains unknown, and replay does not retro-deduct newly mapped recipes.');
+  console.log('Upgrade gate passed: legacy receipt/payment unchanged, stock history remains unknown, old cash retries retain unknown drawer attribution, and replay does not retro-deduct newly mapped recipes.');
 } else throw new Error('Use before/after phases from the verification runner.');
