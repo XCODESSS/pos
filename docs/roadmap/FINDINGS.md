@@ -1,5 +1,23 @@
 # Findings
 
+## 2026-10-20 — Shared drawer, expenses and counted closing
+
+User accepted one shared drawer per outlet and mandatory open shifts for cash. Continued `bdb73a4` on `feat/cash-control`; scope `CASH-CONTROL.md`. Opening and expense HTTP slices first failed404; missing-shift sale failed200-vs409 before enforcement. A replay with a different shift also failed200-vs409 before fixing exact same-drawer intent. V11 is additive; older migrations untouched.
+
+Public HTTP cases exercise normalized/concurrent opening replay, competing open commands, known counted discrepancies, sale tender120 minus change20 posting100, cash/check splits spanning shifts without duplicate batch recognition, cash/noncash expenses and supplier payments, atomic overflow/date/permission failures, receipt/expense/close races, stale counts, negative expected cash, changed intent, history pagination and independent tenants reusing IDs. Cashier sees only active ID/sequence; owner/manager sees totals and manages drawers/expenses; kitchen denied. Old V5 same-amount cash and exact split-command hashes replay after upgrade with null drawer attribution; no backfill or automatic opening.
+
+Final gate `node verification/run.mjs --host-backend --upgrade-from=counterline-backend:9cb1e27 --browser` passed45 cases (43 core + fresh environment + restore), startup mismatch/role probes and21 REA scenarios. Restore preserves a closed drawer with INR100 opening,25 expense,10 supplier cash,65 expected,64 counted and−1 discrepancy; exact replay does not affect the separate new active drawer. Prior cash/stock/count/purchasing/payables/session evidence remains preserved.
+
+Browser observed INR1,000 opening →250 operating expense →100 supplier cash →650 expected,649 counted,−1 explained shortage. Narrow replay recovered expense after closure without a second outflow; stale closing command rejected after another expense and only closed after reload/recount. Beta ignored alpha's pending and selected drawer state. Inventory and customer sales remained unchanged. Desktop/390px screenshots reviewed. Initial cash browser run only failed its final screenshot anchor because `.purchase-detail h3` matched both shift and movement headings; scoping to the direct child fixed it. No app success was inferred from that failed capture; full subsequent runs passed.
+
+Final ignored artifacts `verification/.artifacts/counterline-verify-fb5e3ffc85f7/`; log `.local/cash-final-gate.log`. New scenario step counts include initial state:
+- Shared drawer35: `ev_49ada46289610d4fdccb3234f78e068769e2cb7a6980cf4e400faf49b243491b`.
+- Narrow recovery11: `ev_d0ea76c1d0fb828d2af0e32eabfe2a53543a364a755c8f79d3e3612dabb8e0c0`.
+- Stale close13: `ev_ca3d6835462542cef87ca20762bf4406c9724cab240a7ab2c766f231ea2f3846`.
+- Tenant switch6: `ev_ebfe0fc2a37a1b2493c186268e4659f7f86c298b1721f248ad4a021bc6701d3a`.
+
+Host web build and explicit host-offline JDK distribution/container verification pass. Native Kotlin/Swift sources now select the active drawer and persist original cash commands across uncertain retries. Android `assembleDebug` stopped at missing SDK location before source compilation (`.local/cash-android-build.log`); Mac/Xcode remains unavailable. No native/device/Safari/default-container-download/remote-CI claim. No development/staging restart/promotion, pushes or real-money processing. All runner-owned resources cleaned up. Next: date-range business reports; corrections/refunds/top-ups/fiscal accounting remain explicitly unsupported.
+
 ## 2026-10-20 — Supplier bills, partial payments and outstanding balances
 
 Continued `63cd2cd` on `feat/supplier-payables`. Scope/policies in `PAYABLES.md`. HTTP create/payment/void/summary slices each failed404 before implementing the respective route. A final-payment-slot regression failed200-vs400 before preventing the100th partial record from stranding a balance. V10 is additive; V1–V9 unchanged.

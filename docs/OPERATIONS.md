@@ -12,6 +12,12 @@ This is a pre-production foundation, not approval to run real restaurants. All c
 - Fresh non-development databases remove only the exact, untouched V1 demo dishes before owner bootstrap. Applied V1–V4 migrations remain unchanged. Populated unbound non-development databases are refused, not cleaned or reset.
 - In development only, `.env` supplies the legacy database and first owner, assigned to business `demo`. Existing passwords/data remain unchanged. Never reuse its credentials in staging.
 
+## Cash-control migration readiness (V11)
+
+V11 does not invent an opening drawer or attach historical cash to a shift. After an explicitly authorized upgrade, an owner/manager must open the shared drawer with a counted float before new cash sales, check splits, cash expenses or cash supplier payments can be recorded. Clients must send the observed `cashShiftId`; no unscoped fallback exists. Old exact settlement/split/payment retries preserve their unknown/previous drawer attribution without new postings. Keep the previous restore point and verify cash/client compatibility before promotion; this feature has NOT been promoted to the stopped user environments.
+
+Count/close only after coordinating staff drawer activity. A competing cash movement rejects a stale closing version; reload and recount rather than submitting the old count against a new version. Opening the next shift is a fresh explicit count, not automatic carry-forward. Never relabel a supplier payment as an expense, or fake a refund/top-up with negative spending. Native checkout source compatibility is updated but remains unbuilt/device-unverified.
+
 ## Daily verification
 
 Prerequisites: Node 22.19+, Docker/Compose. Backend/web image builds supply their own JDK/Node build environments.
@@ -104,7 +110,7 @@ A disaster restore can revive sessions/revocations as of the backup. The automat
 - Separate migration/runtime privileges; trusted HTTPS/ingress/proxy configuration; production secret rotation, account recovery/MFA/idle policy; XSS/CSP/security review, isolation-abuse and load testing.
 - Real monitoring/alerts/error correlation, audit access/tamper-resistance policy, restore objectives and an operator incident/support process. Existing readiness/logs are groundwork, not a hosted monitoring implementation.
 - Validated India GST/fiscal numbering/credit-note/refund policy; current receipts remain demo bills and cash recording is not digital payment processing.
-- Complete purchasing/supplier/payable and stock valuation/expiry/reversal workflows, shifts/expenses/reconciliation, loyalty and offline continuity from the full product contract. Existing manual receiving/recipes/waste tracking are only the current inventory increment.
+- Complete purchasing/supplier lifecycle/returns, payable corrections/credits and stock valuation/expiry/reversal workflows, richer business reports, loyalty and offline continuity. Shared cash shifts/operating expenses/count reconciliation are implemented for web/backend; corrections/refunds/deposits/withdrawals/top-ups and fiscal accounting are not.
 - Successful native builds, complete native workflows, physical phones, printers/drawers, accessibility and failure-recovery checks.
 
 No hosting, public TLS, external payment provider, app signing, live restaurant use or cloud account provisioning is authorized by this runbook.

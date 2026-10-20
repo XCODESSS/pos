@@ -2,12 +2,23 @@
 
 Updated: 2026-10-20
 Target: integrated staff-facing multi-tenant SaaS for India/INR, web + Kotlin Android + SwiftUI iOS/iPadOS
-Current milestone: supplier bills/recorded payments verified; expenses and cash-shift control next
-Status: backend/web inventory/counts/purchasing/payables, upgrade/restore and browser flows pass in disposable environments; native/toolchain and production/SaaS lifecycle gates remain open
+Current milestone: shared cash drawer, operating expenses and counted closing verified; richer business reports next
+Status: backend/web inventory/counts/purchasing/payables/cash control, upgrade/restore and browser flows pass in disposable environments; native/toolchain and production/SaaS lifecycle gates remain open
 
 ## Scope and architecture
 
 Independent restaurant businesses are separate tenants. The current shared backend uses explicitly registered database-per-tenant runtimes; each tenant currently has one outlet. No public signup, subscription control plane or multi-outlet memberships exist. Architecture trade-off: D-008. Full contract: `../../PRODUCT.md`. Foundation spec: `FOUNDATION.md`; execution plan: `../superpowers/plans/2026-10-18-evolutionary-prototype-foundation.md`.
+
+## Shared cash drawer and operating expenses — 2026-10-20
+
+- Continued `bdb73a4` on `feat/cash-control`. User explicitly selected one shared drawer per outlet and an open shift required for cash. Contract: `CASH-CONTROL.md`; no merge/promotion/push.
+- Additive V11 records explicit opening floats, attributable cash movements, immediate operating expenses and immutable counted closing/discrepancy snapshots. Only one shift can be open. Owner/manager manages totals/open/close/expenses; cashier can read only active drawer ID/sequence and record sales; kitchen denied.
+- New cash requests require the observed `cashShiftId`. Standalone sales post bill total net of change; each check split posts when received, not again when batches settle. CASH supplier payments and operating expenses post separate outflows exactly once; noncash leaves the drawer unchanged. Cash outflows require today's India date. Opening/count/aggregate numeric limits are checked; negative expected cash is visible, never clamped.
+- Close requires observed version; cash changes race safely with close. Nonzero discrepancy requires a reason. Exact open/close/expense/payment retries preserve original evidence even after closure/new shifts. Legacy cash stays unassigned; old settlement and split hashes still replay without backfill. No closed-shift edit/reopen, refunds/corrections/top-ups or automatic opening carry-forward.
+- Web workspace supports reviewed opening, expense and closing actions, shift/expense/movement pages, ID recovery, retained business-scoped commands and explicit stale-count reload. Checkout/splits/payables capture the selected drawer; uncertain retries retain it. Native takeaway source adapters now also retain cash commands, but both remain uncompiled/device-unverified. Android assembleDebug again stopped at missing SDK before compilation; Mac/Xcode unavailable.
+- Final gate passed45 acceptance cases (43 core + fresh environment + restore), V5→V11 receipt/payment/split preservation, startup identity/DB-role probes and21 REA scenarios. Browser opened INR1,000, spent250 on cleaning and100 on supplier cash, then counted649 against650 expected; stored−1 discrepancy with reason. Narrow recovery did not duplicate expense; stale closure rejected and required recount; beta ignored alpha journals. Stock/customer sales unchanged.
+- Restore preserves closed shift totals/count/discrepancy, expense and supplier-cash links, movement history, exact retries and a separate new active shift, alongside prior facts. Artifacts `verification/.artifacts/counterline-verify-fb5e3ffc85f7/`; log `.local/cash-final-gate.log`; IDs in `FINDINGS.md`. Desktop/390px screenshots reviewed, not real phones/Safari.
+- Host TypeScript build and explicit host-offline Gradle packaging passed. No default-container dependency/remote CI claim. Development/staging remain stopped on V5 images/data/credentials; verification resources cleaned up. Before any future authorized V11 promotion, update clients and explicitly open a counted drawer—no automatic shift is created by migration.
 
 ## Supplier bills and recorded payments — 2026-10-20
 
@@ -72,11 +83,11 @@ Both development and staging Compose stacks, including their databases, were sto
 
 ## Remaining product / release gates
 
-- Complete supplier credits/payment corrections/reversals/advances, procurement pricing/supplier lifecycle/returns and stock valuation/expiry/reversal policies; expenses/shifts/reconciliation; customer consent/loyalty; offline durable outbox, registered devices and synchronization. Existing recipes/manual receiving/waste are the current connected increment, not the complete purchasing product.
+- Complete supplier credits/payment corrections/reversals/advances, procurement pricing/supplier lifecycle/returns and stock valuation/expiry/reversal policies; expense/payment corrections, cash top-ups/deposits/withdrawals and richer business reports; customer consent/loyalty; offline durable outbox, registered devices and synchronization. Existing recipes/manual receiving/waste are the current connected increment, not the complete purchasing product.
 - SaaS tenant lifecycle/subscriptions, large-fleet provisioning/migration/pooling, multi-outlet authorization and hosted deployment.
 - Separate runtime/migrator DB privileges, TLS/ingress/proxy trust, secret rotation, MFA/recovery/idle policy, production monitoring, encrypted/off-host retention and measured recovery objectives, accounting/fiscal rules, security/load/accessibility and hardware validation.
 - Complete native menu choices/check/admin/history/KDS workflows and real builds/devices. Android SDK and Mac/Xcode/signing remain unresolved. Native default tenant URL sources changed, but neither client is claimed built or device-tested.
 
 ## Next action
 
-Next connected increment: expenses → cash shifts/closing → reconciliation. Define opening float, expense versus supplier-payment attribution, counted/expected cash, discrepancy reasons and immutable correction rules before implementation. Existing recorded supplier payments do NOT post to a cash shift; prevent double-counting cash outflows when connecting them. Supplier bills/payments are complete for the bounded web/backend scope in PAYABLES.md, not full payable accounting. Credits/payment reversal and physical goods-return policies remain explicit later work. Resume/promote user environments only when requested. CI remains configured but unexecuted remotely; hosted SaaS/security/native gates remain required.
+Next connected increment: bounded date-range business reports for sales/item performance, operating expenses and cash reconciliation. Keep completed-check sales distinct from actual cash split receipts; exclude opening float from income and avoid classifying supplier payments twice as operating expenses. Use immutable historical bill snapshots and attributed ledger facts, with clear India-date boundaries and permission checks. Do not claim profit/margin without stock costs/valuation, or fiscal reporting compliance. Shared shifts/expenses/closing are complete only for CASH-CONTROL.md's bounded web/backend scope; credits/refunds/corrections/top-ups and goods-return policies remain later work. Then customer consent/loyalty. Resume/promote user environments only when requested. CI remains unexecuted remotely; hosted SaaS/security/native gates remain required.
