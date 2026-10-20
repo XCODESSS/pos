@@ -229,3 +229,76 @@ await capture('purchasing-stale-recovery', { ...purchaseScenario,
 });
 assert.equal((await api(`/purchasing/orders/${stalePurchaseId}`, undefined, token)).data.receipts.length, 0);
 assert.equal((await api('/inventory', undefined, token)).data.ingredients.find(value => value.id === ingredient.id).balanceMilli, 91000);
+
+substitutions.PAYABLE_SUPPLIER_ID = purchasedOrder.supplierId; substitutions.PAYABLE_PURCHASE_ID = purchasedOrder.id;
+const payableScenario = fill(JSON.parse(await readFile(new URL('./rea-payables.json', import.meta.url), 'utf8')));
+const stockBeforeBills = (await api('/inventory', undefined, token)).data;
+const salesBeforeBills = (await api('/reports/today', undefined, token)).data;
+await capture('payables', payableScenario);
+const browserBill = (await api('/payables/bills?limit=100', undefined, token)).data.bills.find(value => value.reference === 'Browser supplier invoice');
+assert.ok(browserBill); assert.equal(browserBill.purchaseOrderId, purchasedOrder.id); assert.equal(browserBill.outstandingPaise, 60000);
+const billDetail = (await api(`/payables/bills/${browserBill.id}`, undefined, token)).data;
+assert.equal(billDetail.payments.length, 1); assert.equal(billDetail.payments[0].amountPaise, 40000);
+const pendingPayment = { kind: 'payment', path: `/payables/bills/${browserBill.id}/payments`, billId: browserBill.id,
+  body: { id: billDetail.payments[0].id, expectedVersion: 0, amountPaise: 40000, paymentDate: '2026-01-02', method: 'BANK_TRANSFER', reference: 'Browser UTR A' }, summary: ['Recover recorded payment, not another transfer.'] };
+const recoveredBill = await capture('payables-narrow-recovery', { ...payableScenario,
+  environment: { ...payableScenario.environment, viewport: { width: 390, height: 844, device_scale_factor: 1 } },
+  storage: { session_storage: [{ origin: process.env.VERIFY_BASE_URL, entries: [{ name: 'counterline.tenant.alpha.payables.pending', value: { source: 'literal', value: JSON.stringify(pendingPayment) } }] }] },
+  actions: [...payableScenario.actions.slice(0, 4),
+    { step_id: 'retry-payment', action: 'click', locator: { kind: 'role', role: 'button', name: 'Retry same supplier action' } },
+    { step_id: 'recovered-payment', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail:has-text("Outstanding ₹600.00")' }, state: 'visible' },
+    { step_id: 'recover-id', action: 'fill', locator: { kind: 'css', selector: '#recover-supplier-bill' }, value: { source: 'literal', value: browserBill.id } },
+    { step_id: 'open-id', action: 'click', locator: { kind: 'css', selector: 'form:has(#recover-supplier-bill) button' } },
+    { step_id: 'retained-payment', action: 'wait_for', locator: { kind: 'css', selector: '[aria-label="Supplier payment history"]:has-text("Browser UTR A")' }, state: 'visible' },
+    { step_id: 'summary', action: 'click', locator: { kind: 'css', selector: '.purchase-detail h3' } },
+  ],
+});
+assert.ok(!recoveredBill.steps.at(-1).artifacts.storage.value.session_storage.some(entry => entry.name === 'counterline.tenant.alpha.payables.pending'));
+assert.deepEqual((await api(`/payables/bills/${browserBill.id}`, undefined, token)).data, billDetail);
+const stalePayment = { ...pendingPayment, body: { ...pendingPayment.body, id: uuid(), amountPaise: 10000, reference: 'Stale draft' } };
+await capture('payables-stale-recovery', { ...payableScenario,
+  storage: { session_storage: [{ origin: process.env.VERIFY_BASE_URL, entries: [
+    { name: 'counterline.tenant.alpha.payables.pending', value: { source: 'literal', value: JSON.stringify(stalePayment) } },
+    { name: 'counterline.tenant.alpha.payables.selected', value: { source: 'literal', value: browserBill.id } },
+  ] }] },
+  actions: [...payableScenario.actions.slice(0, 4),
+    { step_id: 'retry-stale', action: 'click', locator: { kind: 'role', role: 'button', name: 'Retry same supplier action' } },
+    { step_id: 'rejected', action: 'wait_for', locator: { kind: 'css', selector: '.error:has-text("Bill changed")' }, state: 'visible' },
+    { step_id: 'explicit-reload', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail .workspace-notice:has-text("Reload and review")' }, state: 'visible' },
+    { step_id: 'reload', action: 'click', locator: { kind: 'role', role: 'button', name: 'Discard payment draft and reload' } },
+    { step_id: 'final-amount', action: 'fill', locator: { kind: 'css', selector: '#supplier-payment-amount' }, value: { source: 'literal', value: '600' } },
+    { step_id: 'final-reference', action: 'fill', locator: { kind: 'css', selector: '#supplier-payment-reference' }, value: { source: 'literal', value: 'Browser UTR B' } },
+    { step_id: 'review-final', action: 'click', locator: { kind: 'role', role: 'button', name: 'Review supplier payment' } },
+    { step_id: 'confirm-final', action: 'click', locator: { kind: 'role', role: 'button', name: 'Confirm supplier action' } },
+    { step_id: 'paid', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail .purchase-status:has-text("PAID")' }, state: 'visible' },
+    { step_id: 'zero-balance', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail:has-text("Outstanding ₹0.00")' }, state: 'visible' },
+  ],
+});
+const settledSupplierBill = (await api(`/payables/bills/${browserBill.id}`, undefined, token)).data;
+assert.equal(settledSupplierBill.bill.paidPaise, 100000); assert.equal(settledSupplierBill.payments.length, 2);
+const voidBillId = uuid();
+assert.equal((await api('/payables/bills', { id: voidBillId, supplierId: purchasedOrder.supplierId, reference: 'Browser void invoice', billDate: '2026-01-01', dueDate: '2026-01-31', totalPaise: 5000 }, token)).status, 200);
+await capture('payables-void', { ...payableScenario, actions: [...payableScenario.actions.slice(0, 4),
+  { step_id: 'recover-id', action: 'fill', locator: { kind: 'css', selector: '#recover-supplier-bill' }, value: { source: 'literal', value: voidBillId } },
+  { step_id: 'open-id', action: 'click', locator: { kind: 'css', selector: 'form:has(#recover-supplier-bill) button' } },
+  { step_id: 'reason', action: 'fill', locator: { kind: 'css', selector: '#supplier-bill-void-reason' }, value: { source: 'literal', value: 'Wrong total entered' } },
+  { step_id: 'review-void', action: 'click', locator: { kind: 'role', role: 'button', name: 'Review void supplier bill' } },
+  { step_id: 'confirm-void', action: 'click', locator: { kind: 'role', role: 'button', name: 'Confirm supplier action' } },
+  { step_id: 'voided', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-detail .purchase-status:has-text("VOID")' }, state: 'visible' },
+] });
+assert.equal((await api(`/payables/bills/${voidBillId}`, undefined, token)).data.bill.status, 'VOID');
+assert.deepEqual((await api('/inventory', undefined, token)).data, stockBeforeBills);
+assert.deepEqual((await api('/reports/today', undefined, token)).data, salesBeforeBills);
+const payableSwitch = await capture('payables-tenant-switch', { ...payableScenario,
+  start_url: { url: `${process.env.VERIFY_BASE_URL}/t/beta/` },
+  storage: { session_storage: [{ origin: process.env.VERIFY_BASE_URL, entries: [
+    { name: 'counterline.tenant.alpha.payables.pending', value: { source: 'literal', value: JSON.stringify(pendingPayment) } },
+    { name: 'counterline.tenant.alpha.payables.selected', value: { source: 'literal', value: browserBill.id } },
+  ] }] },
+  actions: [...payableScenario.actions.slice(0, 4),
+    { step_id: 'independent-bills', action: 'wait_for', locator: { kind: 'css', selector: '.purchase-history:has-text("Beta payable supplier")' }, state: 'visible' },
+  ],
+});
+const betaPayableText = payableSwitch.steps.at(-1).artifacts.accessibility.value.text;
+assert.ok(!betaPayableText.includes('Browser supplier invoice') && !betaPayableText.includes('Retry same supplier action'));
+assert.ok(!inventoryResult.steps.find(step => step.step_id === 'shortage-preview').artifacts.accessibility.value.text.includes('Supplier bills & payments'), 'cashier has no payable navigation');

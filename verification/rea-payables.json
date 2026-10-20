@@ -1,0 +1,32 @@
+{
+  "browser":{"mode":"launch","executable_path":"{{CHROME}}","headless":true},
+  "start_url":{"url":"{{ORIGIN}}/t/alpha/"},
+  "environment":{"locale":"en-IN","timezone":"Asia/Kolkata","viewport":{"width":1440,"height":1050,"device_scale_factor":1}},
+  "secrets":[{"secret_id":"owner","environment_variable":"VERIFY_BROWSER_OWNER_PASSWORD"}],
+  "actions":[
+    {"step_id":"username","action":"fill","locator":{"kind":"css","selector":"#username"},"value":{"source":"literal","value":"{{BROWSER_OWNER}}"}},
+    {"step_id":"password","action":"fill","locator":{"kind":"css","selector":"#password"},"value":{"source":"secret","secret_id":"owner"}},
+    {"step_id":"signin","action":"click","locator":{"kind":"role","role":"button","name":"Sign in →"}},
+    {"step_id":"payables","action":"click","locator":{"kind":"role","role":"button","name":"Supplier bills & payments"}},
+    {"step_id":"supplier","action":"select_option","locator":{"kind":"css","selector":"#bill-supplier"},"value":{"source":"literal","value":"{{PAYABLE_SUPPLIER_ID}}"}},
+    {"step_id":"reference","action":"fill","locator":{"kind":"css","selector":"#supplier-bill-reference"},"value":{"source":"literal","value":"Browser supplier invoice"}},
+    {"step_id":"total","action":"fill","locator":{"kind":"css","selector":"#supplier-bill-amount"},"value":{"source":"literal","value":"1000.00"}},
+    {"step_id":"bill-date","action":"fill","locator":{"kind":"css","selector":"#supplier-bill-date"},"value":{"source":"literal","value":"2026-01-01"}},
+    {"step_id":"due-date","action":"fill","locator":{"kind":"css","selector":"#supplier-bill-due"},"value":{"source":"literal","value":"2026-01-31"}},
+    {"step_id":"purchase-link","action":"fill","locator":{"kind":"css","selector":"#supplier-bill-purchase"},"value":{"source":"literal","value":"{{PAYABLE_PURCHASE_ID}}"}},
+    {"step_id":"review-bill","action":"click","locator":{"kind":"role","role":"button","name":"Review supplier bill"}},
+    {"step_id":"no-receiving","action":"wait_for","locator":{"kind":"css","selector":".purchase-review:has-text('not a stock receipt or payment')"},"state":"visible"},
+    {"step_id":"confirm-bill","action":"click","locator":{"kind":"role","role":"button","name":"Confirm supplier action"}},
+    {"step_id":"owed","action":"wait_for","locator":{"kind":"css","selector":".purchase-detail:has-text('Outstanding ₹1,000.00'):has-text('OVERDUE')"},"state":"visible"},
+    {"step_id":"payment-amount","action":"fill","locator":{"kind":"css","selector":"#supplier-payment-amount"},"value":{"source":"literal","value":"400"}},
+    {"step_id":"payment-date","action":"fill","locator":{"kind":"css","selector":"#supplier-payment-date"},"value":{"source":"literal","value":"2026-01-02"}},
+    {"step_id":"payment-reference","action":"fill","locator":{"kind":"css","selector":"#supplier-payment-reference"},"value":{"source":"literal","value":"Browser UTR A"}},
+    {"step_id":"review-payment","action":"click","locator":{"kind":"role","role":"button","name":"Review supplier payment"}},
+    {"step_id":"no-processing","action":"wait_for","locator":{"kind":"css","selector":".purchase-review:has-text('does not send money')"},"state":"visible"},
+    {"step_id":"confirm-payment","action":"click","locator":{"kind":"role","role":"button","name":"Confirm supplier action"}},
+    {"step_id":"partial","action":"wait_for","locator":{"kind":"css","selector":".purchase-detail:has-text('Paid ₹400.00'):has-text('Outstanding ₹600.00')"},"state":"visible"},
+    {"step_id":"evidence","action":"wait_for","locator":{"kind":"css","selector":"[aria-label='Supplier payment history']:has-text('Browser UTR A')"},"state":"visible"},
+    {"step_id":"summary","action":"click","locator":{"kind":"css","selector":".purchase-detail h3"}}
+  ],
+  "capture":{"after_each_step":["accessibility"],"at_end":["accessibility","screenshot","url","storage"],"events":["page-errors"]}
+}
