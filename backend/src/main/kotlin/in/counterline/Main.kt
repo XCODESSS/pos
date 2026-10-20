@@ -189,6 +189,30 @@ fun main() {
                         call.require(Permission.STOCK_MANAGE); val input = call.receive<PurchaseClose>()
                         call.respond(withContext(Dispatchers.IO) { call.tenant().purchasing.close(call.parameters["id"]!!, input, call.principal().staff.id) })
                     }
+                    get("/payables/summary") {
+                        call.require(Permission.PAYABLES_READ)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().payables.summary() })
+                    }
+                    get("/payables/bills") {
+                        call.require(Permission.PAYABLES_READ); val before = call.queryLong("before"); val limit = call.queryLimit(20)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().payables.list(before, limit) })
+                    }
+                    post("/payables/bills") {
+                        call.require(Permission.PAYABLES_MANAGE); val input = call.receive<SupplierBillInput>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().payables.create(input, call.principal().staff.id) })
+                    }
+                    get("/payables/bills/{id}") {
+                        call.require(Permission.PAYABLES_READ)
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().payables.get(call.parameters["id"]!!) })
+                    }
+                    post("/payables/bills/{id}/payments") {
+                        call.require(Permission.PAYABLES_MANAGE); val input = call.receive<SupplierPaymentInput>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().payables.pay(call.parameters["id"]!!, input, call.principal().staff.id) })
+                    }
+                    post("/payables/bills/{id}/void") {
+                        call.require(Permission.PAYABLES_MANAGE); val input = call.receive<SupplierBillVoid>()
+                        call.respond(withContext(Dispatchers.IO) { call.tenant().payables.void(call.parameters["id"]!!, input, call.principal().staff.id) })
+                    }
                     get("/tables") {
                         call.require(Permission.ORDERS_READ)
                         call.respond(withContext(Dispatchers.IO) { call.tenant().frontDesk.tables() })

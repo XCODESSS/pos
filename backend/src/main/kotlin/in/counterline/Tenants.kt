@@ -17,6 +17,7 @@ class TenantRuntime(val id: String, val slug: String, val source: HikariDataSour
     val inventory = Inventory(source, json)
     val stockCounts = StockCounts(source, json, inventory)
     val purchasing = Purchasing(source, json, inventory)
+    val payables = Payables(source, json)
     val checkout = Checkout(source, json, inventory)
     val identity = Identity(source)
     val catalog = Catalog(source, json)

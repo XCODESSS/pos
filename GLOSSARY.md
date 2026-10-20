@@ -36,6 +36,16 @@ _Avoid_: Outlet (a business location, not an independent business)
 **Delivery receipt**: An attributable record of ingredients actually received against a purchase order, including a partial delivery.
 _Avoid_: Supplier bill (a request for payment)
 
+**Supplier bill**: A supplier's request for payment recorded as an amount the restaurant owes. It is distinct from a customer bill, purchase order or physical delivery receipt.
+
+**Recorded supplier payment**: A staff assertion that money was already paid to a supplier against a supplier bill. It is not an instruction to transfer money or confirmation from a payment provider.
+
+**Outstanding supplier balance**: The amount still owed on supplier bills after recorded payments and excluding void bills.
+
+**Overdue supplier balance**: An outstanding supplier amount whose due date has passed. A bill due today is not yet overdue.
+
+**Voided supplier bill**: A retained, unpaid supplier bill explicitly withdrawn from the restaurant's outstanding liabilities. Voiding is not a goods return or payment refund.
+
 **Unreceived remainder**: The ordered quantities not yet received. Closing this remainder ends further receiving against that order without returning stock already received.
 
 **Wastage**: Ingredients lost or discarded outside preparation recorded against an accepted food submission.

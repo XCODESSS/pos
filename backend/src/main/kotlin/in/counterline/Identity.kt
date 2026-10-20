@@ -14,12 +14,12 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 import javax.sql.DataSource
 
-enum class Permission { MENU_READ, MENU_MANAGE, ORDERS_READ, ORDERS_WRITE, CASH_RECORD, KITCHEN_READ, KITCHEN_WRITE, REPORTS_READ, STAFF_MANAGE, TABLES_MANAGE, STOCK_READ, STOCK_MANAGE }
+enum class Permission { MENU_READ, MENU_MANAGE, ORDERS_READ, ORDERS_WRITE, CASH_RECORD, KITCHEN_READ, KITCHEN_WRITE, REPORTS_READ, STAFF_MANAGE, TABLES_MANAGE, STOCK_READ, STOCK_MANAGE, PAYABLES_READ, PAYABLES_MANAGE }
 @Serializable enum class StaffRole {
     OWNER, MANAGER, CASHIER, KITCHEN;
     fun permissions(): Set<Permission> = when (this) {
         OWNER -> Permission.entries.toSet()
-        MANAGER -> setOf(Permission.MENU_READ, Permission.MENU_MANAGE, Permission.ORDERS_READ, Permission.ORDERS_WRITE, Permission.CASH_RECORD, Permission.KITCHEN_READ, Permission.KITCHEN_WRITE, Permission.REPORTS_READ, Permission.TABLES_MANAGE, Permission.STOCK_READ, Permission.STOCK_MANAGE)
+        MANAGER -> setOf(Permission.MENU_READ, Permission.MENU_MANAGE, Permission.ORDERS_READ, Permission.ORDERS_WRITE, Permission.CASH_RECORD, Permission.KITCHEN_READ, Permission.KITCHEN_WRITE, Permission.REPORTS_READ, Permission.TABLES_MANAGE, Permission.STOCK_READ, Permission.STOCK_MANAGE, Permission.PAYABLES_READ, Permission.PAYABLES_MANAGE)
         CASHIER -> setOf(Permission.MENU_READ, Permission.ORDERS_READ, Permission.ORDERS_WRITE, Permission.CASH_RECORD, Permission.KITCHEN_READ, Permission.REPORTS_READ)
         KITCHEN -> setOf(Permission.KITCHEN_READ, Permission.KITCHEN_WRITE)
     }
